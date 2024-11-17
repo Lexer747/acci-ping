@@ -102,6 +102,11 @@ func TestFiles(t *testing.T) {
 		Sizes:          StandardTestSizes,
 		TimeZoneOfFile: winter,
 	}.Run)
+	t.Run("verybad", FileTest{
+		FileName:       "verybad-london",
+		Sizes:          StandardTestSizes,
+		TimeZoneOfFile: winter,
+	}.Run)
 }
 
 func TestSmallWindows(t *testing.T) {

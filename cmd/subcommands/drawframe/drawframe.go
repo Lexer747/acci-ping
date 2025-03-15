@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
-package main
+package drawframe
 
 import (
 	"context"
@@ -16,81 +16,87 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/Lexer747/AcciPing/draw"
-	"github.com/Lexer747/AcciPing/files"
-	"github.com/Lexer747/AcciPing/graph"
-	"github.com/Lexer747/AcciPing/graph/data"
-	"github.com/Lexer747/AcciPing/graph/terminal"
-	"github.com/Lexer747/AcciPing/gui"
+	"github.com/Lexer747/acci-ping/draw"
+	"github.com/Lexer747/acci-ping/files"
+	"github.com/Lexer747/acci-ping/graph"
+	"github.com/Lexer747/acci-ping/graph/data"
+	"github.com/Lexer747/acci-ping/graph/terminal"
+	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/utils/check"
+	"github.com/Lexer747/acci-ping/utils/exit"
 )
 
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
-var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
-var termSize = flag.String("term-size", "", "controls the terminal size and fixes it to the input,"+
-	" input is in the form \"<H>x<W>\" e.g. 20x80. H and W must be integers - where H == height, and W == width of the terminal.")
-var profiling = false
+type Config struct {
+	cpuprofile *string
+	memprofile *string
+	termSize   *string
 
-func main() {
-	flag.Usage = func() {
+	*flag.FlagSet
+}
+
+func GetFlags() *Config {
+	f := flag.NewFlagSet("", flag.ContinueOnError)
+	ret := &Config{
+		cpuprofile: f.String("cpuprofile", "", "write cpu profile to `file`"),
+		memprofile: f.String("memprofile", "", "write memory profile to `file`"),
+		termSize: f.String("term-size", "", "controls the terminal size and fixes it to the input,"+
+			" input is in the form \"<H>x<W>\" e.g. 20x80. H and W must be integers - where H == height, and W == width of the terminal."),
+		FlagSet: f,
+	}
+	f.Usage = func() {
 		w := flag.CommandLine.Output()
 		fmt.Fprintf(w, "Usage of %s: reads '.pings' files and outputs the final frame of the capture\n"+
 			"\t drawframe [options] FILE\n\n"+
 			"e.g. %s my_ping_capture.ping\n", os.Args[0], os.Args[0])
 		flag.PrintDefaults()
 	}
-	flag.Parse()
-	closeProfile := startCPUProfiling()
+	return ret
+}
+
+func RunDrawFrame(c *Config) {
+	check.Check(c.Parsed(), "flags not parsed")
+	closeProfile := startCPUProfiling(*c.cpuprofile)
 	defer closeProfile()
-	defer concludeMemProfile()
-	toPrint := flag.Args()
+	defer concludeMemProfile(*c.memprofile)
+	profiling := *c.cpuprofile != "" || *c.memprofile != ""
+
+	toPrint := c.Args()
 	if len(toPrint) == 0 {
 		fmt.Fprint(os.Stderr, "No files found, exiting. Use -h/--help to print usage instructions.\n")
-		os.Exit(0)
+		exit.Success()
 	}
 
-	term, err := makeTerminal()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to open terminal to draw: %s", err.Error())
-		os.Exit(1)
-	}
+	term, err := makeTerminal(c.termSize)
+	exit.OnErrorMsg(err, "failed to open terminal to draw")
 
 	for _, path := range toPrint {
-		run(term, path)
+		run(term, path, profiling)
 	}
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
 }
 
-func run(term *terminal.Terminal, path string) {
+func run(term *terminal.Terminal, path string, profiling bool) {
 	fs, err := os.Stat(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Couldn't stat path %q, failed with: %s", path, err.Error())
-		os.Exit(1)
-	}
+	exit.OnErrorMsgf(err, "Couldn't stat path %q, failed with", path)
 	if fs.IsDir() {
 		err := filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
 			if filepath.Ext(p) != ".pings" {
 				return nil
 			}
-			do(p, term)
+			do(p, term, profiling)
 			return nil
 		})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Couldn't walk path %q, failed with: %s", path, err.Error())
-			os.Exit(1)
-		}
+		exit.OnErrorMsgf(err, "Couldn't walk path %q, failed with", path)
 	} else {
-		do(path, term)
+		do(path, term, profiling)
 	}
 }
 
-func do(path string, term *terminal.Terminal) {
+func do(path string, term *terminal.Terminal, profiling bool) {
 	d, f, err := files.LoadFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Couldn't open and read file, failed with: %s", err.Error())
-		os.Exit(1)
-	}
+	exit.OnErrorMsg(err, "Couldn't open and read file, failed with")
 	f.Close()
 	if err != nil {
 		panic(err.Error())
@@ -113,7 +119,7 @@ func do(path string, term *terminal.Terminal) {
 	}
 }
 
-func makeTerminal() (*terminal.Terminal, error) {
+func makeTerminal(termSize *string) (*terminal.Terminal, error) {
 	if termSize != nil && *termSize != "" {
 		return terminal.NewParsedFixedSizeTerminal(*termSize)
 	} else {
@@ -130,9 +136,9 @@ func printGraph(term *terminal.Terminal, d *data.Data) {
 	}
 }
 
-func concludeMemProfile() {
-	if *memprofile != "" {
-		f, err := os.Create(*memprofile)
+func concludeMemProfile(path string) {
+	if path != "" {
+		f, err := os.Create(path)
 		if err != nil {
 			panic("could not create memory profile: " + err.Error())
 		}
@@ -144,11 +150,10 @@ func concludeMemProfile() {
 	}
 }
 
-func startCPUProfiling() func() {
-	profiling = *cpuprofile != "" || *memprofile != ""
-	if *cpuprofile != "" {
+func startCPUProfiling(path string) func() {
+	if path != "" {
 		runtime.SetCPUProfileRate(1000000)
-		f, err := os.Create(*cpuprofile)
+		f, err := os.Create(path)
 		if err != nil {
 			panic("could not create CPU profile: " + err.Error())
 		}

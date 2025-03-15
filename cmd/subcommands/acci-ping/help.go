@@ -10,16 +10,21 @@ import (
 	"bytes"
 	"context"
 
-	"github.com/Lexer747/AcciPing/draw"
-	"github.com/Lexer747/AcciPing/graph/terminal"
-	"github.com/Lexer747/AcciPing/graph/terminal/ansi"
-	"github.com/Lexer747/AcciPing/gui"
+	"github.com/Lexer747/acci-ping/draw"
+	"github.com/Lexer747/acci-ping/graph/terminal"
+	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/gui"
 )
 
 // help which should only be called once the paint buffer is initialised.
-func (app *Application) help(ctx context.Context, helpChannel chan rune, terminalSizeUpdates chan terminal.Size) {
+func (app *Application) help(
+	ctx context.Context,
+	startShowHelp bool,
+	helpChannel chan rune,
+	terminalSizeUpdates chan terminal.Size,
+) {
 	helpBuffer := app.drawBuffer.Get(draw.HelpIndex)
-	h := help{showHelp: true}
+	h := help{showHelp: startShowHelp}
 	app.GUI.paint(h.render(app.term.Size(), helpBuffer))
 	for {
 		select {

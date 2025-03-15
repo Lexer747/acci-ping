@@ -14,8 +14,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Lexer747/AcciPing/utils/bytes"
-	"github.com/Lexer747/AcciPing/utils/errors"
+	"github.com/Lexer747/acci-ping/utils/bytes"
+	"github.com/Lexer747/acci-ping/utils/errors"
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -51,15 +51,6 @@ func NewPing() *Ping {
 		//nolint:gosec
 		// G115 overflow is expected and required
 		id: uint16(os.Getpid() + 1234),
-	}
-}
-
-func NewPingWithTrust(trust DNSCacheTrust) *Ping {
-	return &Ping{
-		//nolint:gosec
-		// G115 overflow is expected and required
-		id:            uint16(os.Getpid() + 1234),
-		dnsCacheTrust: trust.asMaxDropped(),
 	}
 }
 
@@ -461,18 +452,6 @@ func isIpv4(ip net.IP) bool {
 }
 
 var listenAddr = net.IPv4zero
-
-func (dct DNSCacheTrust) asMaxDropped() uint {
-	switch dct {
-	case LowTrust:
-		return 0
-	case NominalTrust:
-		return 1
-	case HighTrust:
-		return 5
-	}
-	panic("exhaustive:enforce")
-}
 
 func (dct DNSCacheTrust) String() string {
 	switch dct {

@@ -10,8 +10,10 @@ for i in "${SUPPORTED_TUPLES[@]}"; do
 	echo "Building	GOOS=$1	GOARCH=$2"
 	mkdir -p "$1/$2" &> /dev/null
 	pushd "$1/$2" &> /dev/null || exit
-	env GOOS=$1 GOARCH=$2 go build github.com/Lexer747/AcciPing
-	chmod +x AcciPing*
+	env GOOS=$1 GOARCH=$2 go build github.com/Lexer747/acci-ping
+	chmod +x acci-ping*
+    # This doesn't work how I think it should
+	# sudo setcap 'cap_net_raw+eip cap_net_broadcast+eip cap_net_bind_service+eip' acci-ping*
 	popd &> /dev/null || exit
 done
 popd &> /dev/null

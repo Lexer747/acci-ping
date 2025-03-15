@@ -16,16 +16,19 @@ import (
 	"strconv"
 	"time"
 
-	backoff "github.com/Lexer747/AcciPing/backoff"
-	"github.com/Lexer747/AcciPing/draw"
-	"github.com/Lexer747/AcciPing/files"
-	"github.com/Lexer747/AcciPing/graph"
-	"github.com/Lexer747/AcciPing/graph/data"
-	"github.com/Lexer747/AcciPing/graph/terminal"
-	"github.com/Lexer747/AcciPing/ping"
-	"github.com/Lexer747/AcciPing/utils/check"
-	"github.com/Lexer747/AcciPing/utils/errors"
-	"github.com/Lexer747/AcciPing/utils/siphon"
+	backoff "github.com/Lexer747/acci-ping/backoff"
+	"github.com/Lexer747/acci-ping/draw"
+	"github.com/Lexer747/acci-ping/files"
+	"github.com/Lexer747/acci-ping/graph"
+	"github.com/Lexer747/acci-ping/graph/data"
+	"github.com/Lexer747/acci-ping/graph/terminal"
+	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/utils/check"
+	"github.com/Lexer747/acci-ping/utils/errors"
+	"github.com/Lexer747/acci-ping/utils/exit"
+	"github.com/Lexer747/acci-ping/utils/siphon"
 	"golang.org/x/exp/maps"
 )
 
@@ -49,13 +52,20 @@ func (app *Application) Run(
 	channel chan ping.PingResults,
 	existingData *data.Data,
 ) error {
-	// The ping channel which is already running needs to be duplicated, providing one to the Graph and second
-	// to a file writer. This de-couples the processes, we don't want the GUI to affect storing data and vice
-	// versa.
-	graphChannel, fileChannel := siphon.TeeBufferedChannel(ctx, channel, app.config.PingBufferingLimit)
-	fileData, err := duplicateData(app.toUpdate)
-	// TODO support no file operation
-	exitOnError(err)
+	var fileData *data.Data
+	var graphChannel, fileChannel chan ping.PingResults
+	if app.toUpdate != nil {
+		// The ping channel which is already running needs to be duplicated, providing one to the Graph and second
+		// to a file writer. This de-couples the processes, we don't want the GUI to affect storing data and vice
+		// versa.
+		graphChannel, fileChannel = siphon.TeeBufferedChannel(ctx, channel, *app.config.pingBufferingLimit)
+		var err error
+		fileData, err = duplicateData(app.toUpdate)
+		exit.OnError(err)
+	} else {
+		// We don't need to duplicate the channel since we are not writing anything to a file
+		graphChannel = channel
+	}
 
 	app.drawBuffer = draw.NewPaintBuffer()
 
@@ -63,10 +73,10 @@ func (app *Application) Run(
 	app.addFallbackListener(helpAction(helpCh))
 
 	// The graph will take ownership of the data channel and data pointer.
-	app.g = graph.NewGraphWithData(ctx, graphChannel, app.term, app.GUI, app.config.PingsPerMinute, existingData, app.drawBuffer)
-	_ = app.g.Term.ClearScreen(terminal.UpdateAndMove)
+	app.g = graph.NewGraphWithData(ctx, graphChannel, app.term, app.GUI, *app.config.pingsPerMinute, existingData, app.drawBuffer)
+	_ = app.g.Term.ClearScreen(terminal.UpdateSizeAndMoveHome)
 
-	if app.config.TestErrorListener {
+	if *app.config.testErrorListener {
 		app.makeErrorGenerator()
 	}
 
@@ -86,20 +96,22 @@ func (app *Application) Run(
 	// https://go.dev/blog/defer-panic-and-recover
 	//
 	// Each go routine needs to handle a panic in the same way.
-	go func() {
-		defer termRecover()
-		app.writeToFile(ctx, fileData, fileChannel)
-	}()
+	if fileData != nil {
+		go func() {
+			defer termRecover()
+			app.writeToFile(ctx, fileData, fileChannel)
+		}()
+	}
 	go func() {
 		defer termRecover()
 		app.toastNotifications(ctx, terminalSizeUpdates)
 	}()
 	go func() {
 		defer termRecover()
-		app.help(ctx, helpCh, terminalSizeUpdates)
+		app.help(ctx, !*app.config.hideHelpOnStart, helpCh, terminalSizeUpdates)
 	}()
 	defer termRecover()
-	exitOnError(err)
+	exit.OnError(err)
 	return graph()
 }
 
@@ -110,22 +122,31 @@ func (app *Application) Init(ctx context.Context, c Config) (channel chan ping.P
 	p := ping.NewPing()
 	var err error
 	app.term, err = terminal.NewTerminal()
-	exitOnError(err) // If we can't open the terminal for any reason we reasonably can't do anything this program offers.
+	exit.OnError(err) // If we can't open the terminal for any reason we reasonably can't do anything this program offers.
 
-	existingData, app.toUpdate = loadFile(c.FilePath, c.URL)
+	if *c.filePath != "" {
+		existingData, app.toUpdate = loadFile(*c.filePath, *c.url)
+	} else {
+		existingData = data.NewData(*c.url)
+	}
 
-	channel, err = p.CreateChannel(ctx, existingData.URL, c.PingsPerMinute, c.PingBufferingLimit)
+	channel, err = p.CreateChannel(ctx, existingData.URL, *c.pingsPerMinute, *c.pingBufferingLimit)
 	// If Creating the channel has an error this means we cannot continue, the network errors are already
 	// wrapped and retried by this channel, other errors imply some larger problem
-	exitOnError(err)
+	exit.OnError(err)
 	return
 }
 
 func (app *Application) Finish() {
 	_ = app.term.ClearScreen(terminal.UpdateSize)
 	app.term.Print(app.g.LastFrame())
-	app.term.Print("\n\n# Summary\nPing Successfully recorded in file '" + app.config.FilePath + "'\n\t" +
-		app.g.Summarise() + "\n")
+	if *app.config.filePath != "" {
+		app.term.Print("\n\n# Summary\nData Successfully recorded in file '" + *app.config.filePath + "'\n\t" +
+			app.g.Summarise() + "\n")
+	} else {
+		app.term.Print("\n\n# Summary\nData not saved, use `-file [FILE_NAME]` to save recordings in future.\n\t" +
+			app.g.Summarise() + "\n")
+	}
 }
 
 func (app *Application) writeToFile(ctx context.Context, ourData *data.Data, input chan ping.PingResults) {
@@ -162,6 +183,9 @@ func (app *Application) makeErrorGenerator() {
 		go func() { app.errorChannel <- errors.New("Test Error") }()
 		return nil
 	})
+	helpCopy = append(helpCopy,
+		gui.Typography{ToPrint: "Press " + ansi.Green("e") + " to generate a test error.", TextLen: 6 + 1 + 26, Alignment: gui.Left},
+	)
 }
 
 func (app *Application) addListener(r rune, Action func(rune) error) {
@@ -228,6 +252,6 @@ func startCPUProfiling(cpuprofile string) func() {
 func loadFile(file, url string) (*data.Data, *os.File) {
 	// TODO this currently panics if the url's don't match we should do better
 	d, f, err := files.LoadOrCreateFile(file, url)
-	exitOnError(err)
+	exit.OnError(err)
 	return d, f
 }

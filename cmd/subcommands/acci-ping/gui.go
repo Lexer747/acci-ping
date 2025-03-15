@@ -9,9 +9,9 @@ package acciping
 import (
 	"sync"
 
-	"github.com/Lexer747/AcciPing/graph/terminal"
-	"github.com/Lexer747/AcciPing/gui"
-	"github.com/Lexer747/AcciPing/utils/check"
+	"github.com/Lexer747/acci-ping/graph/terminal"
+	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/utils/check"
 )
 
 type GUI struct {
@@ -37,7 +37,7 @@ type paintUpdate int
 const (
 	None       paintUpdate = 0b000000000000000
 	Paint      paintUpdate = 0b000000000000001
-	Invalidate paintUpdate = 0b000000000000010
+	Invalidate paintUpdate = 0b000000000000010 // TODO invalidate invalidates all components but should only per remove GUI element
 )
 
 func (p paintUpdate) String() string {

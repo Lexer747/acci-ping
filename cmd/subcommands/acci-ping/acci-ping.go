@@ -22,6 +22,7 @@ import (
 
 type Config struct {
 	cpuprofile         *string
+	debugStrict        *bool
 	filePath           *string
 	hideHelpOnStart    *bool
 	logFile            *string
@@ -38,6 +39,7 @@ func GetFlags() *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
 	ret := &Config{
 		cpuprofile:         f.String("cpuprofile", "", "write cpu profile to `file`"),
+		debugStrict:        f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
 		filePath:           f.String("file", "", "the file to write the pings into. (default data not saved)"),
 		hideHelpOnStart:    f.Bool("hide-help", false, "if this flag is used the help box will be hidden by default"),
 		logFile:            f.String("l", "", "write logs to `file`. (default no logs written)"),
@@ -59,12 +61,13 @@ func RunAcciPing(c *Config) {
 	check.Check(c.Parsed(), "flags not parsed")
 	closeCPUProfile := startCPUProfiling(*c.cpuprofile)
 	defer closeCPUProfile()
-	defer concludeMemProfile(*c.memprofile)
 	closeLogFile := initLogging(*c.logFile)
 	defer closeLogFile()
 
 	app := Application{}
 	ctx, cancelFunc := context.WithCancelCause(context.Background())
+	closeMemProfile := startMemProfile(ctx, *c.memprofile)
+	defer closeMemProfile()
 	defer cancelFunc(nil)
 	ch, d := app.Init(ctx, *c)
 	err := app.Run(ctx, cancelFunc, ch, d)

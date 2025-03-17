@@ -22,7 +22,7 @@ func TestTerminalWrite(t *testing.T) {
 	t.Parallel()
 	_, stdout, term, _, err := th.NewTestTerminal()
 	assert.NilError(t, err)
-	ctx, cancelFunc := context.WithCancelCause(context.Background())
+	ctx, cancelFunc := context.WithCancelCause(t.Context())
 	defer cancelFunc(nil)
 	_, err = term.StartRaw(ctx, cancelFunc, nil, nil)
 	assert.NilError(t, err)
@@ -36,7 +36,7 @@ func TestTerminalReading(t *testing.T) {
 	stdin, _, term, _, err := th.NewTestTerminal()
 	assert.NilError(t, err)
 	timeout := testErr{}
-	ctx, cancelFunc := context.WithTimeoutCause(context.Background(), time.Second, timeout)
+	ctx, cancelFunc := context.WithTimeoutCause(t.Context(), time.Second, timeout)
 	cancelWithCause := func(err error) { cancelFunc() }
 	defer cancelWithCause(nil)
 	_, err = term.StartRaw(ctx, cancelWithCause, nil, nil)
@@ -53,7 +53,7 @@ func TestTerminalListener(t *testing.T) {
 	t.Parallel()
 	stdin, stdout, term, _, err := th.NewTestTerminal()
 	assert.NilError(t, err)
-	ctx, cancelFunc := context.WithCancelCause(context.Background())
+	ctx, cancelFunc := context.WithCancelCause(t.Context())
 	defer cancelFunc(nil)
 	lastRune := ' '
 	testListener := terminal.ConditionalListener{
@@ -94,7 +94,7 @@ func TestTerminalFallbackListener(t *testing.T) {
 	t.Parallel()
 	stdin, _, term, _, err := th.NewTestTerminal()
 	assert.NilError(t, err)
-	ctx, cancelFunc := context.WithCancelCause(context.Background())
+	ctx, cancelFunc := context.WithCancelCause(t.Context())
 	defer cancelFunc(nil)
 	lastRune := ' '
 	m1 := make(chan struct{})

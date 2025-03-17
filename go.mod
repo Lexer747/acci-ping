@@ -1,8 +1,6 @@
 module github.com/Lexer747/acci-ping
 
-go 1.23.0
-
-toolchain go1.23.2
+go 1.24
 
 require (
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394

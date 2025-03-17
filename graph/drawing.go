@@ -22,7 +22,6 @@ import (
 	"github.com/Lexer747/acci-ping/graph/terminal/typography"
 	"github.com/Lexer747/acci-ping/ping"
 	"github.com/Lexer747/acci-ping/utils"
-	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/numeric"
 	"github.com/Lexer747/acci-ping/utils/sliceutils"
@@ -55,10 +54,12 @@ func (g *Graph) computeFrame(timeBetweenFrames time.Duration, drawSpinner bool) 
 	if drawSpinner {
 		g.lastFrame.spinnerIndex++
 		spinnerValue = spinner(s, g.lastFrame.spinnerIndex, timeBetweenFrames)
+		g.drawingBuffer.Get(draw.SpinnerIndex).Reset()
+		g.drawingBuffer.Get(draw.SpinnerIndex).WriteString(spinnerValue)
 	}
 	if count == g.lastFrame.PacketCount && g.lastFrame.Match(s) {
 		g.data.Unlock() // fast path the frame didn't change
-		if updateGui := g.checkGUI(spinnerValue); updateGui != nil {
+		if updateGui := g.checkGUI(); updateGui != nil {
 			return updateGui
 		}
 		// Even faster path nothing at all too update
@@ -79,6 +80,7 @@ func (g *Graph) computeFrame(timeBetweenFrames time.Duration, drawSpinner bool) 
 	)
 	y := computeYAxis(g.drawingBuffer.Get(draw.YAxisIndex), s, header.Stats, g.data.LockFreeURL())
 	computeFrame(
+		g,
 		g.drawingBuffer.Get(draw.GradientIndex),
 		g.drawingBuffer.Get(draw.DataIndex),
 		g.drawingBuffer.Get(draw.KeyIndex),
@@ -103,42 +105,39 @@ func (g *Graph) computeFrame(timeBetweenFrames time.Duration, drawSpinner bool) 
 	return paintFrame
 }
 
-func (g *Graph) checkGUI(spinnerValue string) func(io.Writer) error {
-	state := g.guiI.GetState()
+func (g *Graph) checkGUI() func(io.Writer) error {
+	state := g.ui.GetState()
 	if state.ShouldDraw() && state.ShouldInvalidate() {
 		return func(w io.Writer) error {
-			defer g.guiI.Drawn(state)
+			defer g.ui.Drawn(state)
 			return errors.Join(
 				onlyGUI(g.drawingBuffer)(w),
 				g.lastFrame.framePainterNoGui(w),
-				utils.Err(w.Write([]byte(spinnerValue))),
 			)
 		}
 	} else if state.ShouldDraw() {
 		return func(w io.Writer) error {
-			defer g.guiI.Drawn(state)
+			defer g.ui.Drawn(state)
 			return errors.Join(
 				onlyGUI(g.drawingBuffer)(w),
-				utils.Err(w.Write([]byte(spinnerValue))),
 			)
 		}
 	} else if state.ShouldInvalidate() {
 		return func(w io.Writer) error {
-			defer g.guiI.Drawn(state)
+			defer g.ui.Drawn(state)
 			return errors.Join(
 				onlyGUI(g.drawingBuffer)(w),
 				g.lastFrame.framePainterNoGui(w),
-				utils.Err(w.Write([]byte(spinnerValue))),
 			)
 		}
 	}
 	return nil
 }
 
-func translate(p ping.PingDataPoint, x *XAxisSpanInfo, y yAxis, s terminal.Size) (yCord, xCord int) {
-	xCord = getX(p.Timestamp, x, y, s)
+func translate(g *Graph, p ping.PingDataPoint, x *XAxisSpanInfo, y yAxis, s terminal.Size) (yCord, xCord int) {
+	xCord = getX(g, p.Timestamp, x, y, s)
 	yCord = getY(p.Duration, y, s)
-	check.Checkf(xCord <= s.Width && yCord <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", xCord, yCord, s.String())
+	g.checkf(xCord <= s.Width && yCord <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", xCord, yCord, s.String())
 	return
 }
 
@@ -152,7 +151,7 @@ func getY(dur time.Duration, yAxis yAxis, s terminal.Size) int {
 	))
 }
 
-func getX(t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) int {
+func getX(g *Graph, t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) int {
 	timestamp := span.timeSpan.End.Sub(t)
 	// These are inverted deliberately since the drawing reference is symmetric in the x
 	newMin := min(s.Width-1, span.endX)
@@ -170,7 +169,8 @@ func getX(t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) int {
 		float64(newMax),
 	))
 
-	check.Checkf(computed <= s.Width, "Computed coord out of bounds (%d) vs %q", computed, s.String())
+	g.checkf(computed <= s.Width, "Computed coord out of bounds (%d) vs %q", computed, s.String())
+
 	return computed
 }
 
@@ -201,6 +201,7 @@ var drop = ansi.Red(typography.Block)
 var dropFiller = ansi.Red(typography.LightBlock)
 
 func computeFrame(
+	g *Graph,
 	toWriteGradientTo, toWriteTo, toWriteKeyTo *bytes.Buffer,
 	iter *graphdata.Iter,
 	runs *data.Runs,
@@ -223,7 +224,7 @@ func computeFrame(
 	// Now iterate over all the individual data points and add them to the graph
 
 	if shouldGradient(runs) {
-		drawGradients(toWriteGradientTo, iter, xAxis, yAxis, s)
+		drawGradients(g, toWriteGradientTo, iter, xAxis, yAxis, s)
 	}
 
 	lastWasDropped := false
@@ -233,7 +234,7 @@ func computeFrame(
 	for i := range iter.Total {
 		p := iter.Get(i)
 		span := xAxisIter.Get(p)
-		x := getX(p.Timestamp, span, yAxis, s)
+		x := getX(g, p.Timestamp, span, yAxis, s)
 		// TODO move the bars into the [drawWindow] so that the labels are on-top, also so that we don't
 		// re-draw more than we need to.
 		if p.Dropped() {
@@ -256,34 +257,35 @@ func computeFrame(
 	window.getKey(toWriteKeyTo)
 }
 
-func drawGradients(toWriteTo *bytes.Buffer, iter *graphdata.Iter, xAxis xAxis, yAxis yAxis, s terminal.Size) {
-	g := gradientState{}
+func drawGradients(g *Graph, toWriteTo *bytes.Buffer, iter *graphdata.Iter, xAxis xAxis, yAxis yAxis, s terminal.Size) {
+	gs := gradientState{}
 	xAxisIter := xAxis.NewIter()
 
 	for i := range iter.Total {
 		p := iter.Get(i)
 		if p.Dropped() {
-			g = g.dropped()
+			gs = gs.dropped()
 			continue
 		}
 		span := xAxisIter.Get(p)
-		y, x := translate(p, span, yAxis, s)
-		if g.draw() && !iter.IsLast(i) {
-			if span == g.lastGoodSpan {
-				lastP := iter.Get(g.lastGoodIndex)
+		y, x := translate(g, p, span, yAxis, s)
+		if gs.draw() && !iter.IsLast(i) {
+			if span == gs.lastGoodSpan {
+				lastP := iter.Get(gs.lastGoodIndex)
 				drawGradient(
+					g,
 					toWriteTo,
 					span, yAxis,
 					x, y,
 					p,
 					lastP,
-					g.lastGoodTerminalWidth,
-					g.lastGoodTerminalHeight,
+					gs.lastGoodTerminalWidth,
+					gs.lastGoodTerminalHeight,
 					s,
 				)
 			}
 		}
-		g = g.set(i, x, y, span)
+		gs = gs.set(i, x, y, span)
 	}
 }
 
@@ -304,10 +306,15 @@ func makeBar(repeating string, s terminal.Size, touchAxis bool) string {
 	if touchAxis {
 		offset = 2
 	}
-	return strings.Repeat(repeating+ansi.CursorDown(1)+ansi.CursorBack(1), s.Height-offset)
+	size := s.Height - offset
+	if size < 0 {
+		return ""
+	}
+	return strings.Repeat(repeating+ansi.CursorDown(1)+ansi.CursorBack(1), size)
 }
 
 func drawGradient(
+	g *Graph,
 	toWriteTo *bytes.Buffer,
 	xAxis *XAxisSpanInfo,
 	yAxis yAxis,
@@ -330,7 +337,7 @@ func drawGradient(
 		interpolatedDuration := lastGood.Duration + time.Duration(toDraw*stepSizeY)
 		interpolatedStamp := lastGood.Timestamp.Add(time.Duration(toDraw * stepSizeX))
 		p := ping.PingDataPoint{Duration: interpolatedDuration, Timestamp: interpolatedStamp}
-		cursorY, cursorX := translate(p, xAxis, yAxis, s)
+		cursorY, cursorX := translate(g, p, xAxis, yAxis, s)
 		pointsX = append(pointsX, cursorX)
 		pointsY = append(pointsY, cursorY)
 	}

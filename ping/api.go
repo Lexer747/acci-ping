@@ -83,7 +83,8 @@ func (p *Ping) OneShot(url string) (time.Duration, error) {
 
 	// Now wait for the result
 	buffer := make([]byte, 255)
-	timeoutCtx, _ := context.WithTimeoutCause(context.Background(), time.Second, pingTimeout{Duration: 100 * time.Millisecond})
+	timeoutCtx, cancel := context.WithTimeoutCause(context.Background(), time.Second, pingTimeout{Duration: 100 * time.Millisecond})
+	defer cancel()
 	n, err := p.pingRead(timeoutCtx, buffer)
 	duration := time.Since(begin)
 	if err != nil {
@@ -336,7 +337,8 @@ func (p *Ping) pingOnChannel(
 	}
 	begin := time.Now()
 	timeout := pingTimeout{Duration: p.timeout}
-	timeoutCtx, _ := context.WithTimeoutCause(ctx, p.timeout, timeout)
+	timeoutCtx, cancel := context.WithTimeoutCause(ctx, p.timeout, timeout)
+	defer cancel()
 	n, err := p.pingRead(timeoutCtx, buffer)
 	duration := time.Since(begin)
 	if err != nil && errors.Is(err, timeout) {

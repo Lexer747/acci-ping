@@ -145,6 +145,64 @@ func (ts *TimeSpan) Contains(t time.Time) bool {
 	return (smallEnough) && (largeEnough)
 }
 
+func (ts *TimeSpan) FormatDraw(width, padding int) (string, []string) {
+	var format string
+	const firstFormat = "02 Jan 2006 15:04:05.00"
+	const halfDay = 12 * time.Hour
+	const halfMonth = 30 * halfDay
+	const halfYear = 12 * halfMonth
+	switch {
+	case ts.Duration > halfYear:
+		format = firstFormat
+	case ts.Duration > halfMonth:
+		format = "Jan 02 15:04"
+	case ts.Duration > halfDay:
+		format = "02 15:04:05"
+	case ts.Duration > 15*time.Minute:
+		format = "15:04:05"
+	case ts.Duration > time.Minute:
+		format = "15:04:05.00"
+	case ts.Duration > 30*time.Second:
+		format = "04:05.0000"
+	default:
+		format = "05.0000"
+	}
+	startString := ts.Begin.Format(firstFormat)
+	if width < len(firstFormat) {
+		return startString, []string{}
+	}
+	remaining := width - (len(startString) + padding + padding)
+	count := remaining / (len(format) + padding)
+	if count <= 0 {
+		return startString, []string{}
+	}
+	step := ts.Duration / time.Duration(count)
+	steps := make([]string, count)
+	for c := range count {
+		steps[c] = ts.Begin.Add(step * time.Duration(c+1)).Format(format)
+	}
+	return startString, steps
+}
+
+func (ts *TimeSpan) String() string {
+	format := "15:04:05.9999"
+	const firstFormat = "02 Jan 2006 15:04:05.99"
+	const halfDay = 12 * time.Hour
+	const halfMonth = 30 * halfDay
+	const halfYear = 12 * halfMonth
+	switch {
+	case ts.Duration > halfYear:
+		format = firstFormat
+	case ts.Duration > halfDay:
+		format = "06 15:04:05"
+	case ts.Duration > halfMonth:
+		format = "Jan 06 15:04"
+	case ts.Duration > time.Minute, ts.Duration > time.Hour:
+		format = "15:04:05.99"
+	}
+	return fmt.Sprintf("%s -> %s (%s)", ts.Begin.Format(firstFormat), ts.End.Format(format), ts.Duration.String())
+}
+
 // AddTimestamp adds the timestamp to the span, only works when initialized with a non-zero time
 func (ts *TimeSpan) AddTimestamp(t time.Time) {
 	if ts.Begin.After(t) {
@@ -321,7 +379,7 @@ func (s *Stats) computeVariance() {
 	s.StandardDeviation = std
 }
 
-func (s Stats) PacketLoss() float64 {
+func (s *Stats) PacketLoss() float64 {
 	return float64(s.PacketsDropped) / float64(s.GoodCount+s.PacketsDropped)
 }
 
@@ -359,70 +417,12 @@ func (s *Stats) AddPoints(values []time.Duration) {
 	}
 }
 
-func (ts TimeSpan) FormatDraw(width, padding int) (string, []string) {
-	var format string
-	const firstFormat = "02 Jan 2006 15:04:05.00"
-	const halfDay = 12 * time.Hour
-	const halfMonth = 30 * halfDay
-	const halfYear = 12 * halfMonth
-	switch {
-	case ts.Duration > halfYear:
-		format = firstFormat
-	case ts.Duration > halfMonth:
-		format = "Jan 02 15:04"
-	case ts.Duration > halfDay:
-		format = "02 15:04:05"
-	case ts.Duration > 15*time.Minute:
-		format = "15:04:05"
-	case ts.Duration > time.Minute:
-		format = "15:04:05.00"
-	case ts.Duration > 30*time.Second:
-		format = "04:05.0000"
-	default:
-		format = "05.0000"
-	}
-	startString := ts.Begin.Format(firstFormat)
-	if width < len(firstFormat) {
-		return startString, []string{}
-	}
-	remaining := width - (len(startString) + padding + padding)
-	count := remaining / (len(format) + padding)
-	if count <= 0 {
-		return startString, []string{}
-	}
-	step := ts.Duration / time.Duration(count)
-	steps := make([]string, count)
-	for c := range count {
-		steps[c] = ts.Begin.Add(step * time.Duration(c+1)).Format(format)
-	}
-	return startString, steps
-}
-
-func (ts TimeSpan) String() string {
-	format := "15:04:05.9999"
-	const firstFormat = "02 Jan 2006 15:04:05.99"
-	const halfDay = 12 * time.Hour
-	const halfMonth = 30 * halfDay
-	const halfYear = 12 * halfMonth
-	switch {
-	case ts.Duration > halfYear:
-		format = firstFormat
-	case ts.Duration > halfDay:
-		format = "06 15:04:05"
-	case ts.Duration > halfMonth:
-		format = "Jan 06 15:04"
-	case ts.Duration > time.Minute, ts.Duration > time.Hour:
-		format = "15:04:05.99"
-	}
-	return fmt.Sprintf("%s -> %s (%s)", ts.Begin.Format(firstFormat), ts.End.Format(format), ts.Duration.String())
-}
-
 func stringFloatTime(f float64) string {
 	d := time.Duration(f)
 	return d.String()
 }
 
-func (s Stats) PickString(remainingSpace int) string {
+func (s *Stats) PickString(remainingSpace int) string {
 	// heuristic is good enough for now
 	switch {
 	case remainingSpace > 100:
@@ -442,11 +442,11 @@ func (s Stats) PickString(remainingSpace int) string {
 	}
 }
 
-func (s Stats) String() string {
+func (s *Stats) String() string {
 	return s.mediumString()
 }
 
-func (s Stats) packetLoss(b *strings.Builder, prefix string) {
+func (s *Stats) packetLoss(b *strings.Builder, prefix string) {
 	if s.PacketsDropped > 0 {
 		percent := numeric.RoundToNearestSigFig(s.PacketLoss(), 4) * 100
 		if percent > 0.1 {
@@ -455,7 +455,7 @@ func (s Stats) packetLoss(b *strings.Builder, prefix string) {
 	}
 }
 
-func (s Stats) superShortString() string {
+func (s *Stats) superShortString() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "\u03BC %s | \u03C3 %s",
 		stringFloatTime(numeric.RoundToNearestSigFig(s.Mean, 4)),
@@ -465,7 +465,7 @@ func (s Stats) superShortString() string {
 	return b.String()
 }
 
-func (s Stats) shortString() string {
+func (s *Stats) shortString() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "\u03BC %s | \u03C3 %s",
 		stringFloatTime(s.Mean), stringFloatTime(s.StandardDeviation))
@@ -474,7 +474,7 @@ func (s Stats) shortString() string {
 	return b.String()
 }
 
-func (s Stats) mediumString() string {
+func (s *Stats) mediumString() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Average \u03BC %s | SD \u03C3 %s",
 		stringFloatTime(s.Mean), stringFloatTime(s.StandardDeviation))
@@ -483,7 +483,7 @@ func (s Stats) mediumString() string {
 	return b.String()
 }
 
-func (s Stats) longString() string {
+func (s *Stats) longString() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Average \u03BC %s | SD \u03C3 %s",
 		stringFloatTime(s.Mean), stringFloatTime(s.StandardDeviation))

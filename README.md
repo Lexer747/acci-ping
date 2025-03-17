@@ -30,6 +30,8 @@ program via the normal control-c.
         write logs to file. (default no logs written)
 * `-debug-error-creator`
         binds the [e] key to create errors for GUI verification
+* `-debug-strict`
+        enables more strict operation in which warnings turn into crashes.
 * `-cpuprofile [file]`
         write cpu profile to file
 * `-memprofile [file]`

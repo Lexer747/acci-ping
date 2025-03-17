@@ -13,13 +13,13 @@ import (
 
 func Check(shouldBeTrue bool, assertMsg string) {
 	if !shouldBeTrue {
-		panic(assertMsg)
+		panic("check failed: " + assertMsg)
 	}
 }
 
 func Checkf(shouldBeTrue bool, format string, a ...any) {
 	if !shouldBeTrue {
-		panic(fmt.Sprintf(format, a...))
+		panic("check failed: " + fmt.Sprintf(format, a...))
 	}
 }
 
@@ -35,17 +35,6 @@ func NotNilf(ptr any, format string, a ...any) {
 	Checkf(asIntPtr != 0, format, a...)
 }
 
-func getPtr(a any) (ret uintptr, ok bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			return
-		}
-	}()
-	ret = reflect.ValueOf(a).Pointer()
-	ok = true
-	return
-}
-
 func NoErr(err error, msg string) {
 	Checkf(err == nil, "%s: %s", msg, err)
 }
@@ -57,4 +46,15 @@ func NoErrf(err error, format string, args ...any) {
 func Must[T any](t T, err error) T {
 	NoErr(err, "Must")
 	return t
+}
+
+func getPtr(a any) (ret uintptr, ok bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			return
+		}
+	}()
+	ret = reflect.ValueOf(a).Pointer()
+	ok = true
+	return
 }

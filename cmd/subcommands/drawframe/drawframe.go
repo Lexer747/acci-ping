@@ -27,9 +27,10 @@ import (
 )
 
 type Config struct {
-	cpuprofile *string
-	memprofile *string
-	termSize   *string
+	cpuprofile  *string
+	debugStrict *bool
+	memprofile  *string
+	termSize    *string
 
 	*flag.FlagSet
 }
@@ -37,8 +38,9 @@ type Config struct {
 func GetFlags() *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
 	ret := &Config{
-		cpuprofile: f.String("cpuprofile", "", "write cpu profile to `file`"),
-		memprofile: f.String("memprofile", "", "write memory profile to `file`"),
+		cpuprofile:  f.String("cpuprofile", "", "write cpu profile to `file`"),
+		debugStrict: f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
+		memprofile:  f.String("memprofile", "", "write memory profile to `file`"),
 		termSize: f.String("term-size", "", "controls the terminal size and fixes it to the input,"+
 			" input is in the form \"<H>x<W>\" e.g. 20x80. H and W must be integers - where H == height, and W == width of the terminal."),
 		FlagSet: f,
@@ -70,14 +72,14 @@ func RunDrawFrame(c *Config) {
 	exit.OnErrorMsg(err, "failed to open terminal to draw")
 
 	for _, path := range toPrint {
-		run(term, path, profiling)
+		run(term, path, profiling, *c.debugStrict)
 	}
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
 }
 
-func run(term *terminal.Terminal, path string, profiling bool) {
+func run(term *terminal.Terminal, path string, profiling, debugStrict bool) {
 	fs, err := os.Stat(path)
 	exit.OnErrorMsgf(err, "Couldn't stat path %q, failed with", path)
 	if fs.IsDir() {
@@ -85,16 +87,16 @@ func run(term *terminal.Terminal, path string, profiling bool) {
 			if filepath.Ext(p) != ".pings" {
 				return nil
 			}
-			do(p, term, profiling)
+			do(p, term, profiling, debugStrict)
 			return nil
 		})
 		exit.OnErrorMsgf(err, "Couldn't walk path %q, failed with", path)
 	} else {
-		do(path, term, profiling)
+		do(path, term, profiling, debugStrict)
 	}
 }
 
-func do(path string, term *terminal.Terminal, profiling bool) {
+func do(path string, term *terminal.Terminal, profiling, debugStrict bool) {
 	d, f, err := files.LoadFile(path)
 	exit.OnErrorMsg(err, "Couldn't open and read file, failed with")
 	f.Close()
@@ -107,7 +109,7 @@ func do(path string, term *terminal.Terminal, profiling bool) {
 		timer := time.NewTimer(time.Second * 60)
 		running := true
 		for running {
-			printGraph(term, d)
+			printGraph(term, d, debugStrict)
 			select {
 			case <-timer.C:
 				running = false
@@ -115,7 +117,7 @@ func do(path string, term *terminal.Terminal, profiling bool) {
 			}
 		}
 	} else {
-		printGraph(term, d)
+		printGraph(term, d, debugStrict)
 	}
 }
 
@@ -127,8 +129,8 @@ func makeTerminal(termSize *string) (*terminal.Terminal, error) {
 	}
 }
 
-func printGraph(term *terminal.Terminal, d *data.Data) {
-	g := graph.NewGraphWithData(context.Background(), nil, term, gui.NoGUI(), 0, d, draw.NewPaintBuffer())
+func printGraph(term *terminal.Terminal, d *data.Data, debugStrict bool) {
+	g := graph.NewGraphWithData(context.Background(), nil, term, gui.NoGUI(), 0, d, draw.NewPaintBuffer(), debugStrict)
 	fmt.Println()
 	err := g.OneFrame()
 	if err != nil {

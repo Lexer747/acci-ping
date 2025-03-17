@@ -8,6 +8,7 @@ package graph
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -25,7 +26,9 @@ import (
 
 type Graph struct {
 	Term *terminal.Terminal
-	guiI gui.GUI
+	ui   gui.GUI
+
+	debugStrict bool
 
 	sinkAlive   bool
 	dataChannel chan ping.PingResults
@@ -48,8 +51,9 @@ func NewGraph(
 	pingsPerMinute float64,
 	URL string,
 	drawingBuffer *draw.Buffer,
+	debugStrict bool,
 ) *Graph {
-	return NewGraphWithData(ctx, input, t, gui, pingsPerMinute, data.NewData(URL), drawingBuffer)
+	return NewGraphWithData(ctx, input, t, gui, pingsPerMinute, data.NewData(URL), drawingBuffer, debugStrict)
 }
 
 func NewGraphWithData(
@@ -60,6 +64,7 @@ func NewGraphWithData(
 	pingsPerMinute float64,
 	data *data.Data,
 	drawingBuffer *draw.Buffer,
+	debugStrict bool,
 ) *Graph {
 	g := &Graph{
 		Term:           t,
@@ -70,7 +75,8 @@ func NewGraphWithData(
 		frameMutex:     &sync.Mutex{},
 		lastFrame:      frame{},
 		drawingBuffer:  drawingBuffer,
-		guiI:           gui,
+		ui:             gui,
+		debugStrict:    debugStrict,
 	}
 	if ctx != nil {
 		// A nil context is valid: It means that no new data is expected and the input channel isn't active
@@ -176,6 +182,14 @@ func (g *Graph) sink(ctx context.Context) {
 			}
 			g.data.AddPoint(p)
 		}
+	}
+}
+
+func (g *Graph) checkf(shouldBeTrue bool, format string, a ...any) {
+	if g.debugStrict {
+		check.Checkf(shouldBeTrue, format, a...)
+	} else if !shouldBeTrue {
+		slog.Error("check failed: " + fmt.Sprintf(format, a...))
 	}
 }
 

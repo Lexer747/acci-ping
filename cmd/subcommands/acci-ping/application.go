@@ -10,9 +10,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
+	"maps"
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"slices"
 	"strconv"
 	"time"
 
@@ -29,7 +32,6 @@ import (
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/exit"
 	"github.com/Lexer747/acci-ping/utils/siphon"
-	"golang.org/x/exp/maps"
 )
 
 type Application struct {
@@ -73,7 +75,16 @@ func (app *Application) Run(
 	app.addFallbackListener(helpAction(helpCh))
 
 	// The graph will take ownership of the data channel and data pointer.
-	app.g = graph.NewGraphWithData(ctx, graphChannel, app.term, app.GUI, *app.config.pingsPerMinute, existingData, app.drawBuffer)
+	app.g = graph.NewGraphWithData(
+		ctx,
+		graphChannel,
+		app.term,
+		app.GUI,
+		*app.config.pingsPerMinute,
+		existingData,
+		app.drawBuffer,
+		*app.config.debugStrict,
+	)
 	_ = app.g.Term.ClearScreen(terminal.UpdateSizeAndMoveHome)
 
 	if *app.config.testErrorListener {
@@ -211,7 +222,8 @@ func (app *Application) addFallbackListener(Action func(rune) error) {
 }
 
 func (app *Application) listeners() []terminal.ConditionalListener {
-	return maps.Values(app.GUI.listeningChars)
+	ret := make([]terminal.ConditionalListener, 0, len(app.GUI.listeningChars))
+	return slices.AppendSeq(ret, maps.Values(app.GUI.listeningChars))
 }
 
 func duplicateData(f *os.File) (*data.Data, error) {
@@ -221,31 +233,58 @@ func duplicateData(f *os.File) (*data.Data, error) {
 	return d, errors.Join(fileErr, readingErr)
 }
 
-func concludeMemProfile(memprofile string) {
-	if memprofile != "" {
-		f, err := os.Create(memprofile)
-		check.NoErr(err, "could not create memory profile")
+func startMemProfile(ctx context.Context, memprofile string) func() {
+	if memprofile == "" {
+		return func() {}
+	}
+	f, err := os.Create(memprofile)
+	check.NoErr(err, "could not create memory profile")
 
-		defer f.Close()
+	doMemProfile := func() {
+		slog.Debug("Writing memory profile")
+		_, err := f.Seek(0, 0)
+		check.NoErr(err, "could not truncate memory profile")
+		_, err = f.Write([]byte{})
+		check.NoErr(err, "could not truncate memory profile")
 		runtime.GC() // get up-to-date statistics
 		if err := pprof.WriteHeapProfile(f); err != nil {
 			check.NoErr(err, "could not write memory profile")
 		}
 	}
+
+	// start a background worker to collect a memory profile to disk every 30s, this slows down the
+	// application but we don't care when have this flag enabled. For accurate CPU profiling this should
+	// be done separately.
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+		for {
+			select {
+			case <-t.C:
+				doMemProfile()
+			case <-ctx.Done():
+				t.Stop()
+				return
+			}
+		}
+	}()
+	return func() {
+		doMemProfile()
+		f.Close()
+	}
 }
 
 func startCPUProfiling(cpuprofile string) func() {
-	if cpuprofile != "" {
-		f, err := os.Create(cpuprofile)
-		check.NoErr(err, "could not create CPU profile")
-		err = pprof.StartCPUProfile(f)
-		check.NoErr(err, "could not start CPU profile")
-		return func() {
-			pprof.StopCPUProfile()
-			check.NoErr(f.Close(), "failed to close profile")
-		}
+	if cpuprofile == "" {
+		return func() {}
 	}
-	return func() {}
+	f, err := os.Create(cpuprofile)
+	check.NoErr(err, "could not create CPU profile")
+	err = pprof.StartCPUProfile(f)
+	check.NoErr(err, "could not start CPU profile")
+	return func() {
+		pprof.StopCPUProfile()
+		check.NoErr(f.Close(), "failed to close profile")
+	}
 }
 
 // TODO incremental read/writes, get the URL ASAP then start the channel, then incremental continuation.

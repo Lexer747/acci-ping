@@ -60,9 +60,7 @@ linters:
     - cyclop
     - durationcheck
     - errname
-    - execinquery
     - exhaustruct
-    - exportloopref
     - forbidigo
     - funlen
     - gci
@@ -71,10 +69,10 @@ linters:
     - godot
     - godox
     - gofumpt
-    - gomnd
     - ireturn
     - mnd
     - nlreturn
+    - nolintlint
     - nonamedreturns
     - revive
     - unparam

@@ -244,13 +244,13 @@ func initTestGraph(t *testing.T, size terminal.Size) (*graph.Graph, func(), erro
 	t.Helper()
 	stdin, _, term, setTerm, err := th.NewTestTerminal()
 	setTerm(size)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	// cancel this, we don't want the graph collecting from the channel in the background
 	cancel()
 	assert.NilError(t, err)
 	pingChannel := make(chan ping.PingResults)
 	defer close(pingChannel)
-	g := graph.NewGraph(ctx, pingChannel, term, gui.NoGUI(), 0, "", draw.NewPaintBuffer())
+	g := graph.NewGraph(ctx, pingChannel, term, gui.NoGUI(), 0, "", draw.NewPaintBuffer(), true)
 	return g, func() { stdin.WriteCtrlC(t) }, err
 }
 

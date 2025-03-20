@@ -104,6 +104,17 @@ func TestFiles(t *testing.T) {
 	}.Run)
 }
 
+func TestSmallWindows(t *testing.T) {
+	t.Parallel()
+	t.Run("Small Sizes", FileTest{
+		FileName: "huge-over-days",
+		Sizes: []terminal.Size{
+			{Height: 2, Width: 2},
+		},
+		TimeZoneOfFile: winter,
+	}.Run)
+}
+
 func (ft FileTest) Run(t *testing.T) {
 	t.Parallel()
 

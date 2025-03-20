@@ -80,6 +80,7 @@ func (dw *drawWindow) draw(toWriteTo *bytes.Buffer) {
 		} else {
 			getColour = ansi.Green
 		}
+		// TODO this can write outside the terminal...
 		if l.leftJustify {
 			toWriteTo.WriteString(ansi.CursorPosition(l.y, l.x-len(l.text)) + getColour(l.text+" "+l.symbol))
 		} else /* rightJustify */ {

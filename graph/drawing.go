@@ -135,7 +135,7 @@ func (g *Graph) checkGUI() func(io.Writer) error {
 }
 
 func translate(g *Graph, p ping.PingDataPoint, x *XAxisSpanInfo, y yAxis, s terminal.Size) (yCord, xCord int) {
-	xCord = getX(g, p.Timestamp, x, y, s)
+	xCord = getX(p.Timestamp, x, y, s)
 	yCord = getY(p.Duration, y, s)
 	g.checkf(xCord <= s.Width && yCord <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", xCord, yCord, s.String())
 	return
@@ -147,20 +147,15 @@ func getY(dur time.Duration, yAxis yAxis, s terminal.Size) int {
 		float64(yAxis.stats.Min),
 		float64(yAxis.stats.Max),
 		float64(s.Height-2),
-		2,
+		min(2.0, float64(s.Height)),
 	))
 }
 
-func getX(g *Graph, t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) int {
+func getX(t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) int {
 	timestamp := span.timeSpan.End.Sub(t)
 	// These are inverted deliberately since the drawing reference is symmetric in the x
 	newMin := min(s.Width-1, span.endX)
 	newMax := max(y.labelSize, span.startX)
-	if newMin < newMax {
-		tmp := newMin
-		newMin = newMax
-		newMax = tmp
-	}
 	computed := int(numeric.NormalizeToRange(
 		float64(timestamp),
 		0,
@@ -168,9 +163,6 @@ func getX(g *Graph, t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) 
 		float64(newMin),
 		float64(newMax),
 	))
-
-	g.checkf(computed <= s.Width, "Computed coord out of bounds (%d) vs %q", computed, s.String())
-
 	return computed
 }
 
@@ -234,7 +226,7 @@ func computeFrame(
 	for i := range iter.Total {
 		p := iter.Get(i)
 		span := xAxisIter.Get(p)
-		x := getX(g, p.Timestamp, span, yAxis, s)
+		x := getX(p.Timestamp, span, yAxis, s)
 		// TODO move the bars into the [drawWindow] so that the labels are on-top, also so that we don't
 		// re-draw more than we need to.
 		if p.Dropped() {
@@ -382,7 +374,7 @@ func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats
 	return yAxis{
 		size:      size.Height,
 		stats:     stats,
-		labelSize: durationSize + 4,
+		labelSize: min(durationSize+4, size.Width),
 	}
 }
 
@@ -434,8 +426,20 @@ func computeXAxis(
 	remaining := space
 	// First add the initial dot for A E S T H E T I C S
 	fmt.Fprint(toWriteTo, ansi.CursorPosition(s.Height, 1)+origin+padding+padding+padding+padding)
+
 	total := graphdata.Spans(spans).Count()
 	xAxisSpans := combineSpansPixelWise(spans, space, total)
+	if space <= 1 {
+		for _, span := range xAxisSpans {
+			span.startX = 1
+			span.endX = 1
+		}
+		return xAxis{
+			size:        s.Width,
+			spans:       xAxisSpans,
+			overallSpan: overall,
+		}
+	}
 
 	// Now we need to iterate every "span", where a span is some pre-determined gap in the pings which is
 	// considered so large that we are reasonably confident that it was another recording session.

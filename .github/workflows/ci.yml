@@ -2,9 +2,9 @@ name: Go
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   pull_request:
-    branches: [ "main" ]
+    branches-ignore: [ "main", "dev" ]
 
 jobs:
 
@@ -48,5 +48,5 @@ jobs:
           version: v1.64.7
           verify: false
           # This linter works based on the file modification when running under github actions because it's
-          # not allowed access to the git history and therefore gets the wrong date for all files.
+          # not given full access to the git history and therefore gets the wrong date for all files.
           args: --disable goheader

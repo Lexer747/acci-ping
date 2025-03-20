@@ -112,20 +112,20 @@ func (g *Graph) Run(
 	}
 	terminalUpdates := make(chan terminal.Size)
 	graph := func() error {
-		size := g.Term.Size()
+		size := g.Term.GetSize()
 		defer close(terminalUpdates)
 		for {
 			select {
 			case <-ctx.Done():
 				return context.Cause(ctx)
 			case <-frameRate.C:
-				if err = g.Term.UpdateCurrentTerminalSize(); err != nil {
+				if err = g.Term.UpdateSize(); err != nil {
 					return err
 				}
-				if size != g.Term.Size() {
+				if size != g.Term.GetSize() {
 					slog.Debug("sending size update", "size", size)
 					terminalUpdates <- size
-					size = g.Term.Size()
+					size = g.Term.GetSize()
 				}
 				toWrite := g.computeFrame(timeBetweenFrames, true)
 				err = toWrite(g.Term)
@@ -143,7 +143,7 @@ func (g *Graph) OneFrame() error {
 	if err := g.Term.ClearScreen(terminal.MoveHome); err != nil {
 		return err
 	}
-	if err := g.Term.UpdateCurrentTerminalSize(); err != nil {
+	if err := g.Term.UpdateSize(); err != nil {
 		return err
 	}
 	toWrite := g.computeFrame(0, false)
@@ -195,8 +195,8 @@ func (g *Graph) checkf(shouldBeTrue bool, format string, a ...any) {
 
 type frame struct {
 	PacketCount       int64
-	yAxis             yAxis
-	xAxis             xAxis
+	yAxis             drawingYAxis
+	xAxis             drawingXAxis
 	framePainter      func(io.Writer) error
 	framePainterNoGui func(io.Writer) error
 	spinnerIndex      int

@@ -191,12 +191,10 @@ func (ts *TimeSpan) String() string {
 	const halfMonth = 30 * halfDay
 	const halfYear = 12 * halfMonth
 	switch {
-	case ts.Duration > halfYear:
+	case ts.Duration > halfYear, ts.Duration > halfMonth:
 		format = firstFormat
 	case ts.Duration > halfDay:
-		format = "06 15:04:05"
-	case ts.Duration > halfMonth:
-		format = "Jan 06 15:04"
+		format = "02 Jan 15:04:05"
 	case ts.Duration > time.Minute, ts.Duration > time.Hour:
 		format = "15:04:05.99"
 	}

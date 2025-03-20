@@ -17,8 +17,18 @@ var Home = CursorPosition(1, 1)
 
 // Spec definitions
 
-func CursorUp(n int) string   { return CSI + s(n) + "A" }
-func CursorDown(n int) string { return CSI + s(n) + "B" }
+func CursorUp(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return CSI + s(n) + "A"
+}
+func CursorDown(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return CSI + s(n) + "B"
+}
 
 // CursorForward will emit a no-op for values of [n] less than 0
 func CursorForward(n int) string {
@@ -76,6 +86,9 @@ func CursorPosition(row, column int) string {
 		return CSI + ";" + s(column) + "H"
 	} else if column == 1 {
 		return CSI + s(row) + "H"
+	}
+	if row <= 0 && column <= 0 {
+		return ""
 	}
 	return CSI + s(row) + ";" + s(column) + "H"
 }

@@ -40,6 +40,7 @@ func main() {
 			// fallthrough
 		}
 	}
+	// TODO explain subcommands in this help ...
 	a := acciping.GetFlags()
 	FlagParseError(a.Parse(os.Args[1:]))
 	acciping.RunAcciPing(a)

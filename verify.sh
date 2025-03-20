@@ -11,5 +11,5 @@ export LOCAL_FRAME_DIFFS=1
 # can never be cached as they rely other computers to pass/fail.
 go test -count=1 -race ./...
 if [[ "$1" == "update" ]]; then
-    find . -name '*frame.actual' -exec bash -c 'mv -f $0 ${0/frame.actual/frame}; echo "updating $0"' {} \;
+	find . -name '*frame.actual' -exec bash -c 'mv -f $0 ${0/frame.actual/frame}; echo "updating $0"' {} \;
 fi

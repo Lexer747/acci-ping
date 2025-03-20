@@ -17,7 +17,7 @@ import (
 	is "gotest.tools/v3/assert/cmp"
 )
 
-func AssertFloatEqual(t *testing.T, expected float64, actual float64, sigFigs int, msgAndArgs ...interface{}) {
+func AssertFloatEqual(t *testing.T, expected float64, actual float64, sigFigs int, msgAndArgs ...any) {
 	t.Helper()
 	a := numeric.RoundToNearestSigFig(actual, sigFigs)
 	e := numeric.RoundToNearestSigFig(expected, sigFigs)

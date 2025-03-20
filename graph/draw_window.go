@@ -9,11 +9,13 @@ package graph
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 
 	"github.com/Lexer747/acci-ping/graph/data"
 	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
 	"github.com/Lexer747/acci-ping/graph/terminal/typography"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/utils/check"
 )
 
 // drawWindow is an optimiser and beautifier for the actual points being drawn to a given frame. The
@@ -23,9 +25,10 @@ import (
 // This also directly enables not painting over labels and the other span based printing choosing which points
 // to highlight.
 type drawWindow struct {
-	cache  map[coords]drawnData
-	labels []label
-	max    int
+	cache       map[coords]drawnData
+	labels      []label
+	debugStrict bool
+	max         int
 }
 
 // coords are the unique key to identify some data to be drawn
@@ -55,10 +58,11 @@ const (
 	green
 )
 
-func newDrawWindow(total int64, spans int) *drawWindow {
+func newDrawWindow(total int64, spans int, debugStrict bool) *drawWindow {
 	return &drawWindow{
-		cache:  make(map[coords]drawnData, int(total)),
-		labels: make([]label, 0, spans*2),
+		cache:       make(map[coords]drawnData, int(total)),
+		labels:      make([]label, 0, spans*2),
+		debugStrict: debugStrict,
 	}
 }
 
@@ -74,16 +78,18 @@ func (dw *drawWindow) draw(toWriteTo *bytes.Buffer) {
 	}
 	// If these are drawn indeterministically then we will get shimmer as labels may be fighting for Z-Preference
 	for _, l := range dw.labels {
-		var getColour func(string) string
+		var addColour func(string) string
 		if l.colour == red {
-			getColour = ansi.Red
+			addColour = ansi.Red
 		} else {
-			getColour = ansi.Green
+			addColour = ansi.Green
 		}
 		if l.leftJustify {
-			toWriteTo.WriteString(ansi.CursorPosition(l.y, l.x-len(l.text)) + getColour(l.text+" "+l.symbol))
+			// ensure that we don't write to a negative coord should the terminal be very small.
+			xPos := max(1, l.x-len(l.text))
+			toWriteTo.WriteString(ansi.CursorPosition(l.y, xPos) + addColour(l.text+" "+l.symbol))
 		} else /* rightJustify */ {
-			toWriteTo.WriteString(ansi.CursorPosition(l.y, l.x) + getColour(l.symbol+" "+l.text))
+			toWriteTo.WriteString(ansi.CursorPosition(l.y, l.x) + addColour(l.symbol+" "+l.text))
 		}
 	}
 }
@@ -133,6 +139,7 @@ func (dw *drawWindow) addPoint(
 }
 
 func (dw *drawWindow) add(x, y int, label bool) {
+	dw.checkf(x > 0 && y > 0, "(x, y): {%d, %d} being added to draw window out of bounds", x, y)
 	c := coords{x, y}
 	if drawData, found := dw.cache[c]; found {
 		if drawData.isLabel {
@@ -153,28 +160,32 @@ func (dw *drawWindow) add(x, y int, label bool) {
 	}
 }
 
+func (dw *drawWindow) checkf(shouldBeTrue bool, format string, a ...any) {
+	if dw.debugStrict {
+		check.Checkf(shouldBeTrue, format, a...)
+	} else if !shouldBeTrue {
+		slog.Error("check failed: " + fmt.Sprintf(format, a...))
+	}
+}
+
 // addLabel will spread over the drawWindow all the coords which the label will occupy this ensures we draw on
 // top of data points and the text is legible.
 func (dw *drawWindow) addLabel(x, y int, leftJustify bool, symbol, labelStr string, colour colour) {
 	c := coords{x, y}
+	dir := 1
 	if leftJustify {
-		for i := range len(labelStr) {
-			extendedX := (x + 2) - i
-			if extendedX == x {
-				// Don't double count the point itself
-				continue
-			}
-			dw.add(extendedX, y, true)
+		dir = -1
+	}
+	for i := range len(labelStr) {
+		extendedX := (x + 2) + (dir * i)
+		if extendedX == x {
+			// Don't double count the point itself
+			continue
 		}
-	} else {
-		for i := range len(labelStr) {
-			extendedX := (x + 2) + i
-			if extendedX == x {
-				// Don't double count the point itself
-				continue
-			}
-			dw.add(extendedX, y, true)
+		if extendedX < 1 {
+			break // don't add label text outside the coordinate system
 		}
+		dw.add(extendedX, y, true)
 	}
 	dw.labels = append(dw.labels, label{
 		coords:      c,

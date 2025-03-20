@@ -1,6 +1,9 @@
 #!/bin/bash
 
 SUPPORTED_TUPLES=("darwin amd64" "darwin arm64" "linux amd64" "linux arm64" "windows amd64")
+if [[ $1 == "unit-tests" ]]; then
+	SUPPORTED_TUPLES=("linux amd64")
+fi
 OUT_DIR="out"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
@@ -12,7 +15,7 @@ for i in "${SUPPORTED_TUPLES[@]}"; do
 	pushd "$1/$2" &> /dev/null || exit
 	env GOOS=$1 GOARCH=$2 go build github.com/Lexer747/acci-ping
 	chmod +x acci-ping*
-    # This doesn't work how I think it should
+	# This doesn't work how I think it should
 	# sudo setcap 'cap_net_raw+eip cap_net_broadcast+eip cap_net_bind_service+eip' acci-ping*
 	popd &> /dev/null || exit
 done

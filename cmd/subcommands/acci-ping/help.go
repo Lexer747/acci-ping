@@ -25,7 +25,7 @@ func (app *Application) help(
 ) {
 	helpBuffer := app.drawBuffer.Get(draw.HelpIndex)
 	h := help{showHelp: startShowHelp}
-	app.GUI.paint(h.render(app.term.Size(), helpBuffer))
+	app.GUI.paint(h.render(app.term.GetSize(), helpBuffer))
 	for {
 		select {
 		case <-ctx.Done():
@@ -38,7 +38,7 @@ func (app *Application) help(
 				h.showHelp = !h.showHelp
 			default:
 			}
-			app.GUI.paint(h.render(app.term.Size(), helpBuffer))
+			app.GUI.paint(h.render(app.term.GetSize(), helpBuffer))
 		}
 	}
 }

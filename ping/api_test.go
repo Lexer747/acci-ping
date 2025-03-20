@@ -19,7 +19,7 @@ import (
 )
 
 func TestOneShot_google_com(t *testing.T) {
-	shouldTest(t)
+	networkingEnvGuard(t)
 	t.Parallel()
 	p := ping.NewPing()
 	duration, err := p.OneShot("www.google.com")
@@ -28,12 +28,12 @@ func TestOneShot_google_com(t *testing.T) {
 }
 
 func TestChannel_google_com(t *testing.T) {
-	shouldTest(t)
+	networkingEnvGuard(t)
 	t.Parallel()
 	p := ping.NewPing()
 	ctx, cancelFunc := context.WithCancel(t.Context())
 	_, err := p.CreateChannel(ctx, "www.google.com", -1, 0)
-	assert.Assert(t, is.ErrorContains(err, ""), "invalid pings per minute")
+	assert.Assert(t, is.ErrorContains(err, "invalid pings per minute"))
 	channel, err := p.CreateChannel(ctx, "www.google.com", 0, 0)
 	assert.NilError(t, err)
 	for range 2 {
@@ -44,7 +44,6 @@ func TestChannel_google_com(t *testing.T) {
 }
 
 func TestUint16Wrapping(t *testing.T) {
-	shouldTest(t)
 	t.Parallel()
 	var i uint16 = 1
 	for i != 0 {
@@ -53,7 +52,7 @@ func TestUint16Wrapping(t *testing.T) {
 	assert.Equal(t, uint16(1), i+1)
 }
 
-func shouldTest(t *testing.T) {
+func networkingEnvGuard(t *testing.T) {
 	t.Helper()
 	if !env.SHOULD_TEST_NETWORK() {
 		t.Skip()

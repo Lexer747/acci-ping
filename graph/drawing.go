@@ -43,7 +43,7 @@ var noFrame = func(w io.Writer) error { return nil }
 func (g *Graph) computeFrame(timeBetweenFrames time.Duration, drawSpinner bool) func(io.Writer) error {
 	// This is race-y so ensure a consistent size for rendering, don't allow each sub-frame to re-compute the
 	// size of the terminal.
-	s := g.Term.Size()
+	s := g.Term.GetSize()
 	g.data.Lock()
 	count := g.data.LockFreeTotalCount()
 	if count == 0 {
@@ -134,33 +134,35 @@ func (g *Graph) checkGUI() func(io.Writer) error {
 	return nil
 }
 
-func translate(g *Graph, p ping.PingDataPoint, x *XAxisSpanInfo, y yAxis, s terminal.Size) (yCord, xCord int) {
-	xCord = getX(g, p.Timestamp, x, y, s)
+func translate(p ping.PingDataPoint, x *XAxisSpanInfo, y drawingYAxis, s terminal.Size) (xCord, yCord int) {
+	xCord = getX(p.Timestamp, x, y, s)
 	yCord = getY(p.Duration, y, s)
-	g.checkf(xCord <= s.Width && yCord <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", xCord, yCord, s.String())
 	return
 }
 
-func getY(dur time.Duration, yAxis yAxis, s terminal.Size) int {
+func getY(dur time.Duration, yAxis drawingYAxis, s terminal.Size) int {
+	newMin := max(1, s.Height-2)
+	newMax := min(2, s.Height)
 	return int(numeric.NormalizeToRange(
 		float64(dur),
 		float64(yAxis.stats.Min),
 		float64(yAxis.stats.Max),
-		float64(s.Height-2),
-		2,
+		float64(newMin),
+		float64(newMax),
 	))
 }
 
-func getX(g *Graph, t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) int {
-	timestamp := span.timeSpan.End.Sub(t)
-	// These are inverted deliberately since the drawing reference is symmetric in the x
-	newMin := min(s.Width-1, span.endX)
+func getX(t time.Time, span *XAxisSpanInfo, y drawingYAxis, s terminal.Size) int {
+	newMin := min(max(1, s.Width-1), span.endX)
 	newMax := max(y.labelSize, span.startX)
-	if newMin < newMax {
-		tmp := newMin
-		newMin = newMax
-		newMax = tmp
+	timestamp := span.timeSpan.End.Sub(t)
+	if span.pingStats.GoodCount+span.spanStats.PacketsDropped <= 1 {
+		// Edge case, when we have exactly one datum but the overall graph has more than one datum so we
+		// didn't short-circuit and need to draw this one point in an arbitrary point between the spans start
+		// and end.
+		return int(numeric.NormalizeToRange(0.5, 0, 1, float64(newMin), float64(newMax)))
 	}
+	// These are inverted deliberately since the drawing reference is symmetric in the x
 	computed := int(numeric.NormalizeToRange(
 		float64(timestamp),
 		0,
@@ -168,9 +170,6 @@ func getX(g *Graph, t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) 
 		float64(newMin),
 		float64(newMax),
 	))
-
-	g.checkf(computed <= s.Width, "Computed coord out of bounds (%d) vs %q", computed, s.String())
-
 	return computed
 }
 
@@ -205,8 +204,8 @@ func computeFrame(
 	toWriteGradientTo, toWriteTo, toWriteKeyTo *bytes.Buffer,
 	iter *graphdata.Iter,
 	runs *data.Runs,
-	xAxis xAxis,
-	yAxis yAxis,
+	xAxis drawingXAxis,
+	yAxis drawingYAxis,
 	s terminal.Size,
 ) {
 	if iter.Total < 1 {
@@ -229,12 +228,12 @@ func computeFrame(
 
 	lastWasDropped := false
 	lastDroppedTerminalX := -1
-	window := newDrawWindow(iter.Total, len(xAxis.spans))
+	window := newDrawWindow(iter.Total, len(xAxis.spans), g.debugStrict)
 	xAxisIter := xAxis.NewIter()
 	for i := range iter.Total {
 		p := iter.Get(i)
 		span := xAxisIter.Get(p)
-		x := getX(g, p.Timestamp, span, yAxis, s)
+		x := getX(p.Timestamp, span, yAxis, s)
 		// TODO move the bars into the [drawWindow] so that the labels are on-top, also so that we don't
 		// re-draw more than we need to.
 		if p.Dropped() {
@@ -250,6 +249,13 @@ func computeFrame(
 		}
 		lastWasDropped = false
 		y := getY(p.Duration, yAxis, s)
+		g.checkf(
+			x > 0 && x <= s.Width && y > 0 && y <= s.Height,
+			"(x, y) {%d, %d} [%s, %s] coordinate out of terminal {%s} bounds. Index: %d",
+			x, y,
+			p.Timestamp.String(), p.Duration.String(),
+			s.String(), i,
+		)
 		window.addPoint(p, span.pingStats, yAxis.stats, span.width, x, y, centreX)
 	}
 	window.draw(toWriteTo)
@@ -257,7 +263,7 @@ func computeFrame(
 	window.getKey(toWriteKeyTo)
 }
 
-func drawGradients(g *Graph, toWriteTo *bytes.Buffer, iter *graphdata.Iter, xAxis xAxis, yAxis yAxis, s terminal.Size) {
+func drawGradients(g *Graph, toWriteTo *bytes.Buffer, iter *graphdata.Iter, xAxis drawingXAxis, yAxis drawingYAxis, s terminal.Size) {
 	gs := gradientState{}
 	xAxisIter := xAxis.NewIter()
 
@@ -268,7 +274,8 @@ func drawGradients(g *Graph, toWriteTo *bytes.Buffer, iter *graphdata.Iter, xAxi
 			continue
 		}
 		span := xAxisIter.Get(p)
-		y, x := translate(g, p, span, yAxis, s)
+		x, y := translate(p, span, yAxis, s)
+		g.checkf(x <= s.Width && y <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", x, y, s.String())
 		if gs.draw() && !iter.IsLast(i) {
 			if span == gs.lastGoodSpan {
 				lastP := iter.Get(gs.lastGoodIndex)
@@ -317,7 +324,7 @@ func drawGradient(
 	g *Graph,
 	toWriteTo *bytes.Buffer,
 	xAxis *XAxisSpanInfo,
-	yAxis yAxis,
+	yAxis drawingYAxis,
 	x, y int,
 	current ping.PingDataPoint,
 	lastGood ping.PingDataPoint,
@@ -337,7 +344,8 @@ func drawGradient(
 		interpolatedDuration := lastGood.Duration + time.Duration(toDraw*stepSizeY)
 		interpolatedStamp := lastGood.Timestamp.Add(time.Duration(toDraw * stepSizeX))
 		p := ping.PingDataPoint{Duration: interpolatedDuration, Timestamp: interpolatedStamp}
-		cursorY, cursorX := translate(g, p, xAxis, yAxis, s)
+		cursorX, cursorY := translate(p, xAxis, yAxis, s)
+		g.checkf(cursorX <= s.Width && cursorY <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", cursorY, cursorX, s.String())
 		pointsX = append(pointsX, cursorX)
 		pointsY = append(pointsY, cursorY)
 	}
@@ -352,7 +360,7 @@ func shouldGradient(runs *data.Runs) bool {
 }
 
 // TODO this has a bug when height is less than 12 and it renders no timestamps
-func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats, url string) yAxis {
+func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats, url string) drawingYAxis {
 	toWriteTo.Grow(size.Height)
 
 	makeTitle(toWriteTo, size, stats, url)
@@ -378,11 +386,11 @@ func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats
 		}
 	}
 	// Last line is always a bar
-	fmt.Fprint(toWriteTo, ansi.CursorPosition(size.Height-1, 1)+ansi.White(typography.Vertical))
-	return yAxis{
+	fmt.Fprint(toWriteTo, ansi.CursorPosition(max(1, size.Height-1), 1)+ansi.White(typography.Vertical))
+	return drawingYAxis{
 		size:      size.Height,
 		stats:     stats,
-		labelSize: durationSize + 4,
+		labelSize: min(durationSize+4, size.Width),
 	}
 }
 
@@ -406,7 +414,7 @@ func makeTitle(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats, u
 	}
 }
 
-type yAxis struct {
+type drawingYAxis struct {
 	size      int
 	stats     *data.Stats
 	labelSize int
@@ -427,15 +435,27 @@ func computeXAxis(
 	s terminal.Size,
 	overall *data.TimeSpan,
 	spans []*graphdata.SpanInfo,
-) xAxis {
+) drawingXAxis {
 	padding := ansi.White(typography.Horizontal)
 	origin := ansi.Magenta(typography.Bullet) + " "
 	space := s.Width - 6
 	remaining := space
 	// First add the initial dot for A E S T H E T I C S
 	fmt.Fprint(toWriteTo, ansi.CursorPosition(s.Height, 1)+origin+padding+padding+padding+padding)
+
 	total := graphdata.Spans(spans).Count()
 	xAxisSpans := combineSpansPixelWise(spans, space, total)
+	if space <= 1 {
+		for _, span := range xAxisSpans {
+			span.startX = 1
+			span.endX = 1
+		}
+		return drawingXAxis{
+			size:        s.Width,
+			spans:       xAxisSpans,
+			overallSpan: overall,
+		}
+	}
 
 	// Now we need to iterate every "span", where a span is some pre-determined gap in the pings which is
 	// considered so large that we are reasonably confident that it was another recording session.
@@ -443,7 +463,7 @@ func computeXAxis(
 	// In each iteration, we must determine the time in which the span lives and how much terminal space it
 	// should take up. And then the actual values so that we actually plot against this axis accurately.
 	for _, span := range xAxisSpans {
-		span.startX = s.Width - remaining
+		span.startX = min(s.Width, s.Width-remaining)
 
 		start, times := span.timeSpan.FormatDraw(span.width, 2)
 		if len(times) < 1 {
@@ -459,14 +479,14 @@ func computeXAxis(
 			remaining = xAxisDrawTimes(toWriteTo, times, remaining, padding)
 		}
 
-		span.endX = s.Width - remaining
+		span.endX = min(s.Width, s.Width-remaining)
 	}
 	// Finally we add these vertical bars to indicate that the axis is not continuous and a new graph is
 	// starting.
 	if len(xAxisSpans) > 1 {
 		addYAxisVerticalSpanIndicator(toWriteSpanBars, s, xAxisSpans)
 	}
-	return xAxis{
+	return drawingXAxis{
 		size:        s.Width,
 		spans:       xAxisSpans,
 		overallSpan: overall,
@@ -578,21 +598,21 @@ func xAxisDrawTimes(b *bytes.Buffer, times []string, remaining int, padding stri
 	return remaining
 }
 
-type xAxis struct {
+type drawingXAxis struct {
 	size        int
 	spans       []*XAxisSpanInfo
 	overallSpan *data.TimeSpan
 }
 
 type xAxisIter struct {
-	*xAxis
+	*drawingXAxis
 	spanIndex int
 }
 
-func (x xAxis) NewIter() *xAxisIter {
+func (x drawingXAxis) NewIter() *xAxisIter {
 	return &xAxisIter{
-		xAxis:     &x,
-		spanIndex: 0,
+		drawingXAxis: &x,
+		spanIndex:    0,
 	}
 }
 

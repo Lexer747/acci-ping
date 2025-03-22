@@ -39,7 +39,7 @@ func NewTestTerminal() (
 		m.Lock()
 		*captured = newSize
 		m.Unlock()
-		_ = t.UpdateCurrentTerminalSize()
+		_ = t.UpdateSize()
 	}
 	return stdin, stdout, t, setTermSize, err
 }

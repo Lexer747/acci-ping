@@ -44,14 +44,14 @@ func (app *Application) toastNotifications(ctx context.Context, terminalSizeUpda
 			// First generate a unique id for this error and add it to our map.
 			key := store.insertToast(toShow)
 			// Now refresh the window size and write the toast notification to the window
-			app.GUI.paint(store.render(app.term.Size(), toastBuffer))
+			app.GUI.paint(store.render(app.term.GetSize(), toastBuffer))
 			store.Unlock()
 			// Now after some timeout, remove the notification and re-render
 			go func() {
 				<-time.After(10 * time.Second)
 				store.Lock()
 				delete(store.toasts, key)
-				app.GUI.paint(store.render(app.term.Size(), toastBuffer))
+				app.GUI.paint(store.render(app.term.GetSize(), toastBuffer))
 				store.Unlock()
 			}()
 		}

@@ -10,6 +10,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,6 +31,7 @@ import (
 type Config struct {
 	cpuprofile  *string
 	debugStrict *bool
+	logFile     *string
 	memprofile  *string
 	termSize    *string
 
@@ -40,6 +43,7 @@ func GetFlags() *Config {
 	ret := &Config{
 		cpuprofile:  f.String("cpuprofile", "", "write cpu profile to `file`"),
 		debugStrict: f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
+		logFile:     f.String("l", "", "write logs to `file`. (default no logs written)"),
 		memprofile:  f.String("memprofile", "", "write memory profile to `file`"),
 		termSize: f.String("term-size", "", "controls the terminal size and fixes it to the input,"+
 			" input is in the form \"<H>x<W>\" e.g. 20x80. H and W must be integers - where H == height, and W == width of the terminal."),
@@ -60,6 +64,8 @@ func RunDrawFrame(c *Config) {
 	closeProfile := startCPUProfiling(*c.cpuprofile)
 	defer closeProfile()
 	defer concludeMemProfile(*c.memprofile)
+	closeLogFile := initLogging(*c.logFile)
+	defer closeLogFile()
 	profiling := *c.cpuprofile != "" || *c.memprofile != ""
 
 	toPrint := c.Args()
@@ -167,5 +173,27 @@ func startCPUProfiling(path string) func() {
 			f.Close()
 		}
 	}
+	return func() {}
+}
+
+func initLogging(file string) func() {
+	if file != "" {
+		f, err := os.Create(file)
+		check.NoErr(err, "could not create Log file")
+		h := slog.NewTextHandler(f, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		slog.SetDefault(slog.New(h))
+		slog.Debug("Logging started", "file", file)
+		return func() {
+			slog.Debug("Logging finished, closing", "file", file)
+			check.NoErr(f.Close(), "failed to close log file")
+		}
+	}
+	// If no file is specified we want to stop all logging
+	h := slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
+		Level: slog.LevelError,
+	})
+	slog.SetDefault(slog.New(h))
 	return func() {}
 }

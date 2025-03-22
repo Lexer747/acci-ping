@@ -43,7 +43,7 @@ var noFrame = func(w io.Writer) error { return nil }
 func (g *Graph) computeFrame(timeBetweenFrames time.Duration, drawSpinner bool) func(io.Writer) error {
 	// This is race-y so ensure a consistent size for rendering, don't allow each sub-frame to re-compute the
 	// size of the terminal.
-	s := g.Term.Size()
+	s := g.Term.GetSize()
 	g.data.Lock()
 	count := g.data.LockFreeTotalCount()
 	if count == 0 {
@@ -142,19 +142,21 @@ func translate(g *Graph, p ping.PingDataPoint, x *XAxisSpanInfo, y yAxis, s term
 }
 
 func getY(dur time.Duration, yAxis yAxis, s terminal.Size) int {
+	newMin := max(1, s.Height-2)
+	newMax := min(2, s.Height)
 	return int(numeric.NormalizeToRange(
 		float64(dur),
 		float64(yAxis.stats.Min),
 		float64(yAxis.stats.Max),
-		float64(s.Height-2),
-		min(2.0, float64(s.Height)),
+		float64(newMin),
+		float64(newMax),
 	))
 }
 
 func getX(t time.Time, span *XAxisSpanInfo, y yAxis, s terminal.Size) int {
 	timestamp := span.timeSpan.End.Sub(t)
 	// These are inverted deliberately since the drawing reference is symmetric in the x
-	newMin := min(s.Width-1, span.endX)
+	newMin := min(max(1, s.Width-1), span.endX)
 	newMax := max(y.labelSize, span.startX)
 	computed := int(numeric.NormalizeToRange(
 		float64(timestamp),
@@ -221,7 +223,7 @@ func computeFrame(
 
 	lastWasDropped := false
 	lastDroppedTerminalX := -1
-	window := newDrawWindow(iter.Total, len(xAxis.spans))
+	window := newDrawWindow(iter.Total, len(xAxis.spans), g.debugStrict)
 	xAxisIter := xAxis.NewIter()
 	for i := range iter.Total {
 		p := iter.Get(i)
@@ -242,6 +244,13 @@ func computeFrame(
 		}
 		lastWasDropped = false
 		y := getY(p.Duration, yAxis, s)
+		g.checkf(
+			x > 0 && x <= s.Width && y > 0 && y <= s.Height,
+			"(x, y) {%d, %d} [%s, %s] coordinate out of terminal {%s} bounds. Index: %d",
+			x, y,
+			p.Timestamp.String(), p.Duration.String(),
+			s.String(), i,
+		)
 		window.addPoint(p, span.pingStats, yAxis.stats, span.width, x, y, centreX)
 	}
 	window.draw(toWriteTo)
@@ -370,7 +379,7 @@ func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats
 		}
 	}
 	// Last line is always a bar
-	fmt.Fprint(toWriteTo, ansi.CursorPosition(size.Height-1, 1)+ansi.White(typography.Vertical))
+	fmt.Fprint(toWriteTo, ansi.CursorPosition(max(1, size.Height-1), 1)+ansi.White(typography.Vertical))
 	return yAxis{
 		size:      size.Height,
 		stats:     stats,

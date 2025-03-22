@@ -31,10 +31,10 @@ func main() {
 	writeLineListener := terminal.Listener{
 		Name: "blankLine",
 		Action: func(r rune) error {
-			halfSize := (t.Size().Width - 21) / 2
-			toPrint := fmt.Sprintf("W:%-5dH:%-5dR:%-5s", t.Size().Width, t.Size().Height, strconv.QuoteRune(r))
+			halfSize := (t.GetSize().Width - 21) / 2
+			toPrint := fmt.Sprintf("W:%-5dH:%-5dR:%-5s", t.GetSize().Width, t.GetSize().Height, strconv.QuoteRune(r))
 			line := strings.Repeat(".", halfSize) + ansi.Yellow(toPrint) + strings.Repeat(".", halfSize)
-			if t.Size().Width%2 == 0 {
+			if t.GetSize().Width%2 == 0 {
 				line += "."
 			} else {
 				line += ""

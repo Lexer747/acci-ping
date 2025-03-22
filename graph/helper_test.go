@@ -26,13 +26,20 @@ func makeBuffer(size terminal.Size) []string {
 
 type ansiState struct {
 	cursorRow, cursorColumn int
-	buffer                  []string
-	size                    terminal.Size
-	ansiText                string
-	asRunes                 []rune
-	head                    int
-	outOfBounds             bool
+	// buffer is the in memory representation of the terminal, each entry of the slice is a row.
+	buffer      []string
+	size        terminal.Size
+	ansiText    string
+	asRunes     []rune
+	head        int
+	outOfBounds bool
 
+	// terminalWrapping will allow the helper to line wrap the output text when the end of the terminal is
+	// reached, instead of panicking.
+	terminalWrapping bool
+
+	// for errors in tests we accumulate this debug object which will store the runes processed to create the
+	// current terminal.
 	debug debug
 }
 
@@ -65,6 +72,7 @@ func (d debug) consume(a *ansiState, consumed rune) {
 		cur: debugItem{
 			sequence:   append(a.debug.cur.sequence, consumed),
 			startIndex: a.debug.cur.startIndex,
+			command:    a.debug.cur.command,
 			endIndex:   a.head,
 		},
 	}
@@ -89,11 +97,16 @@ func (d debug) String() string {
 			b.WriteString(", ")
 		}
 	}
-	b.WriteString(d.cur.String() + "]")
+	b.WriteString("\nCur: " + d.cur.String() + "]")
 	return b.String()
 }
 func (d debugItem) String() string {
-	return fmt.Sprintf("{command:%s sequence:[%s] startIndex:%d endIndex:%d}",
+	if d.command == "" {
+		return fmt.Sprintf("{sequence:[%s] startIndex:%d endIndex:%d}",
+			string(d.sequence), d.startIndex, d.endIndex,
+		)
+	}
+	return fmt.Sprintf("{command:%q sequence:[%s] startIndex:%d endIndex:%d}",
 		d.command, string(d.sequence), d.startIndex, d.endIndex,
 	)
 }
@@ -143,16 +156,17 @@ func (a *ansiState) consumeDigits() int {
 	return int(parsed)
 }
 
-func playAnsiOntoStringBuffer(ansiText string, buffer []string, size terminal.Size) []string {
+func playAnsiOntoStringBuffer(ansiText string, buffer []string, size terminal.Size, terminalWrapping bool) []string {
 	a := &ansiState{
-		cursorRow:    1,
-		cursorColumn: 1,
-		buffer:       buffer,
-		size:         size,
-		ansiText:     ansiText,
-		asRunes:      []rune(ansiText),
-		head:         0,
-		debug:        debug{data: []debugItem{}},
+		cursorRow:        1,
+		cursorColumn:     1,
+		buffer:           buffer,
+		size:             size,
+		ansiText:         ansiText,
+		asRunes:          []rune(ansiText),
+		head:             0,
+		debug:            debug{data: []debugItem{}},
+		terminalWrapping: terminalWrapping,
 	}
 
 	for {
@@ -195,27 +209,28 @@ func (a *ansiState) write(c rune) {
 func (a *ansiState) handleControl(start int) {
 	switch {
 	case a.isNext('?'):
+		a.debug.setCommand(a, "show|hide cursor")
 		// show hide cursor control bytes
 		a.consumeExact("25")
 		if !a.consumeOneOf("lh") {
 			panic(fmt.Sprintf("unexpected control byte sequence %q", string(a.asRunes[start:a.head])))
 		}
-		a.debug.setCommand(a, "show|hide cursor")
 	case a.isNext('H'): // CursorPosition
+		a.debug.setCommand(a, "CursorPosition 1, 1")
 		// Shortest possible hand for 'CSI1;1H'
 		a.changeCursor(1, 1)
 		a.consume()
-		a.debug.setCommand(a, "CursorPosition 1, 1")
 	case a.isNext(';'): // CursorPosition
 		// The first row param has been omitted (meaning it's one)
 		a.consume()
 		d := a.consumeDigits()
+		a.debug.setCommand(a, "CursorPosition %d, 1", d)
 		a.consumeExact("H")
 		a.changeCursor(d, 1)
-		a.debug.setCommand(a, "CursorPosition %d, 1", d)
 	case a.isDigit() || a.isNegativeSign():
 		d := a.consumeDigits()
-		switch a.peek() {
+		peeked := a.peek()
+		switch peeked {
 		case 'm':
 			a.consume()
 			a.debug.setCommand(a, "Colour")
@@ -223,30 +238,30 @@ func (a *ansiState) handleControl(start int) {
 			// Both params present
 			a.consume()
 			col := a.consumeDigits()
+			a.debug.setCommand(a, "CursorPosition %d, %d", col, d)
 			a.consumeExact("H")
 			a.changeCursor(col, d)
-			a.debug.setCommand(a, "CursorPosition %d, %d", col, d)
 		case 'H': // CursorPosition
 			// The second column param has been omitted (meaning it's one)
+			a.debug.setCommand(a, "CursorPosition 1, %d", d)
 			a.changeCursor(1, d)
 			a.consume()
-			a.debug.setCommand(a, "CursorPosition 1, %d", d)
 		case 'A': // CursorUp
+			a.debug.setCommand(a, "CursorUp")
 			a.changeCursor(a.cursorColumn, a.cursorRow-d)
 			a.consume()
-			a.debug.setCommand(a, "CursorUp")
 		case 'B': // CursorDown
+			a.debug.setCommand(a, "CursorDown")
 			a.changeCursor(a.cursorColumn, a.cursorRow+d)
 			a.consume()
-			a.debug.setCommand(a, "CursorDown")
 		case 'C': // CursorForward
+			a.debug.setCommand(a, "CursorForward")
 			a.changeCursor(a.cursorColumn+d, a.cursorRow)
 			a.consume()
-			a.debug.setCommand(a, "CursorForward")
 		case 'D': // CursorBack
+			a.debug.setCommand(a, "CursorBack")
 			a.changeCursor(a.cursorColumn-d, a.cursorRow)
 			a.consume()
-			a.debug.setCommand(a, "CursorBack")
 		case 'E': // CursorNextLine
 			panic("todo CursorNextLine")
 		case 'F': // CursorPreviousLine
@@ -254,6 +269,7 @@ func (a *ansiState) handleControl(start int) {
 		case 'G': // CursorHorizontalAbsolute
 			panic("todo CursorHorizontalAbsolute")
 		case 'J': // EraseInDisplay
+			a.debug.setCommand(a, "EraseInDisplay %d", d)
 			switch ansi.ED(d) {
 			case ansi.CursorToScreenEnd:
 			case ansi.CursorToScreenBegin:
@@ -264,10 +280,10 @@ func (a *ansiState) handleControl(start int) {
 				panic("unknown EraseInDisplay enum")
 			}
 			a.consume()
-			a.debug.setCommand(a, "EraseInDisplay %d", d)
 		case 'K': // EraseInLine
 			panic("todo EraseInLine")
 		}
+		a.debug.consume(a, peeked)
 	default:
 	}
 }
@@ -285,10 +301,26 @@ func (a *ansiState) changeCursor(newC, newR int) {
 		a.cursorColumn = a.size.Width - 1
 		a.cursorRow--
 	}
+	if a.terminalWrapping && a.cursorRow > a.size.Height {
+		// since we are allowed to wrap, we can print this newline and move the cursor back up to the start of
+		// the now new line.
+		a.newline()
+		a.cursorRow--
+		a.cursorColumn = 1
+	}
 	if a.cursorRow > a.size.Height || a.cursorRow < 0 {
 		a.outOfBounds = true
 	} else {
 		a.outOfBounds = false
 	}
 	check.Checkf(a.cursorColumn != 0 && a.cursorRow != 0, "cursor should not be 0. Debug: %s", a.debug)
+}
+
+func (a *ansiState) newline() {
+	// We create a "newline" by rotating all the string buffers (each entry is a row) up one position
+	for i := range len(a.buffer) - 1 {
+		a.buffer[i] = a.buffer[i+1]
+	}
+	// then inserting a new clean row to the last entry.
+	a.buffer[len(a.buffer)-1] = strings.Repeat(" ", a.size.Width)
 }

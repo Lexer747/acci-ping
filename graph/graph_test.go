@@ -237,7 +237,7 @@ func drawGraph(t *testing.T, size terminal.Size, input []ping.PingDataPoint) []s
 
 	actual := eval(t, g, input)
 	output := makeBuffer(size)
-	return playAnsiOntoStringBuffer(actual, output, size)
+	return playAnsiOntoStringBuffer(actual, output, size, false)
 }
 
 func initTestGraph(t *testing.T, size terminal.Size) (*graph.Graph, func(), error) {

@@ -81,7 +81,7 @@ func RunAcciPing(c *Config) {
 func initLogging(file string) func() {
 	if file != "" {
 		f, err := os.Create(file)
-		check.NoErr(err, "could not create CPU profile")
+		check.NoErr(err, "could not create Log file")
 		h := slog.NewTextHandler(f, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		})

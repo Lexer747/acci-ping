@@ -34,9 +34,10 @@ const (
 )
 
 type FileTest struct {
-	FileName       string
-	Sizes          []terminal.Size
-	TimeZoneOfFile *time.Location
+	FileName         string
+	Sizes            []terminal.Size
+	TimeZoneOfFile   *time.Location
+	TerminalWrapping bool
 }
 
 var StandardTestSizes = []terminal.Size{
@@ -109,9 +110,17 @@ func TestSmallWindows(t *testing.T) {
 	t.Run("Small Sizes", FileTest{
 		FileName: "huge-over-days",
 		Sizes: []terminal.Size{
+			{Height: 1, Width: 1},
 			{Height: 2, Width: 2},
+			{Height: 3, Width: 3},
+			{Height: 4, Width: 4},
+			{Height: 5, Width: 5},
+			{Height: 6, Width: 6},
+			{Height: 7, Width: 7},
+			{Height: 8, Width: 8},
 		},
-		TimeZoneOfFile: winter,
+		TimeZoneOfFile:   winter,
+		TerminalWrapping: true,
 	}.Run)
 }
 
@@ -121,7 +130,7 @@ func (ft FileTest) Run(t *testing.T) {
 	d := graphTh.GetFromFile(t, ft.getInputFileName())
 	d = d.In(ft.TimeZoneOfFile)
 	for _, size := range ft.Sizes {
-		actualStrings := produceFrame(t, size, d)
+		actualStrings := produceFrame(t, size, d, ft.TerminalWrapping)
 
 		// ft.update(t, size, actualStrings)
 		ft.assertEqual(t, size, actualStrings)
@@ -169,7 +178,7 @@ func (ft FileTest) update(t *testing.T, size terminal.Size, actualStrings []stri
 	t.Log("Only call update drawing once")
 }
 
-func produceFrame(t *testing.T, size terminal.Size, data *data.Data) []string {
+func produceFrame(t *testing.T, size terminal.Size, data *data.Data, terminalWrapping bool) []string {
 	t.Helper()
 	stdin, _, term, setTerm, err := termTh.NewTestTerminal()
 	setTerm(size)
@@ -182,5 +191,5 @@ func produceFrame(t *testing.T, size terminal.Size, data *data.Data) []string {
 	g := graph.NewGraphWithData(ctx, pingChannel, term, gui.NoGUI(), 0, data, draw.NewPaintBuffer(), true)
 	defer func() { stdin.WriteCtrlC(t) }()
 	output := makeBuffer(size)
-	return playAnsiOntoStringBuffer(g.ComputeFrame(), output, size)
+	return playAnsiOntoStringBuffer(g.ComputeFrame(), output, size, terminalWrapping)
 }

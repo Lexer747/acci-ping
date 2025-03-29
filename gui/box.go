@@ -48,16 +48,20 @@ type BoxCfg struct {
 
 func (b Box) Draw(size terminal.Size, buf *bytes.Buffer) {
 	p := b.position(size)
-	bar := strings.Repeat("─", b.boxTextWidth())
+	bar := strings.Repeat("─", b.boxTextWidth(size))
 	corners := getCorner(b.Style)
 	buf.WriteString(ansi.CursorPosition(p.startY, p.startX) + corners.TopLeft + bar + corners.TopRight)
-	// TODO trim error box when more than height
+	end := 0
 	for i, t := range b.BoxText {
+		end = i
+		if i >= size.Height {
+			break
+		}
 		buf.WriteString(ansi.CursorPosition(p.startY+i+1, p.startX) + "│")
-		t.init(b.boxTextWidth()).Draw(size, buf)
+		t.init(b.boxTextWidth(size)).Draw(size, buf)
 		buf.WriteString("|")
 	}
-	buf.WriteString(ansi.CursorPosition(p.startY+b.height()+1, p.startX) + corners.BottomLeft + bar + corners.BottomRight)
+	buf.WriteString(ansi.CursorPosition(p.startY+end+2, p.startX) + corners.BottomLeft + bar + corners.BottomRight)
 }
 
 type boxPosition struct {
@@ -72,14 +76,14 @@ func (b Box) position(size terminal.Size) boxPosition {
 		originX := size.Width / 2
 		originY := size.Height / 2
 		ret = boxPosition{
-			startY: originY - b.height()/2,
-			startX: originX - b.width()/2,
+			startY: originY - b.height(size)/2,
+			startX: originX - b.width(size)/2,
 		}
 	case p.Vertical == Centre && p.Horizontal == Right:
 		originY := size.Height / 2
 		ret = boxPosition{
-			startY: originY - b.height()/2,
-			startX: size.Width - b.width(),
+			startY: originY - b.height(size)/2,
+			startX: size.Width - b.width(size),
 		}
 	default:
 		panic(fmt.Sprintf("unhandled:box:position %+v", p))
@@ -91,16 +95,16 @@ func (b Box) position(size terminal.Size) boxPosition {
 	return ret
 }
 
-func (b Box) height() int {
-	return len(b.BoxText)
+func (b Box) height(size terminal.Size) int {
+	return min(size.Height-1, len(b.BoxText))
 }
 
-func (b Box) width() int {
-	return b.boxTextWidth() + b.widthFromStyle()
+func (b Box) width(size terminal.Size) int {
+	return b.boxTextWidth(size) + b.widthFromStyle()
 }
 
-func (b Box) boxTextWidth() int {
-	if b.height() == 0 {
+func (b Box) boxTextWidth(size terminal.Size) int {
+	if b.height(size) == 0 {
 		return b.Configuration.DefaultWidth
 	}
 	ret := 0

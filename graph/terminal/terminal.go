@@ -322,7 +322,6 @@ func (t *Terminal) beingListening(ctx context.Context) {
 			heard := string(buffer[:received.n])
 			slog.Debug("got keyboard input", "received", heard)
 			for _, r := range heard {
-				// TODO document multiple valid listeners - especially ctrl-C interactions
 				t.processListenedRune(r)
 			}
 			// if we don't have the processing signal this clear would be racey against stdin.

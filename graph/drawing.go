@@ -359,7 +359,6 @@ func shouldGradient(runs *data.Runs) bool {
 	return runs.GoodPackets.Longest > 2
 }
 
-// TODO this has a bug when height is less than 12 and it renders no timestamps
 func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats, url string) drawingYAxis {
 	toWriteTo.Grow(size.Height)
 
@@ -368,8 +367,6 @@ func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats
 	gapSize := 2
 	if size.Height > 20 {
 		gapSize++
-	} else if size.Height < 12 {
-		gapSize--
 	}
 	durationSize := (gapSize * 3) / 2
 

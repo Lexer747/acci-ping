@@ -59,9 +59,11 @@ type Terminal struct {
 	listeners []ConditionalListener
 	fallbacks []Listener
 
-	stdin                *stdin
-	stdout               *stdout
-	terminalSizeCallBack func() Size
+	stdin  io.Reader
+	stdout io.Writer
+
+	stdinFd              int
+	terminalSizeCallBack func() (Size, error)
 
 	isTestTerminal bool
 	isDynamicSize  bool
@@ -76,9 +78,11 @@ type Terminal struct {
 // [Terminal.StartRaw] in which it listens for key strokes, it also tries to read the terminal size from the
 // environment on startup.
 func NewTerminal() (*Terminal, error) {
-	// TODO check both stdout and stderr for a terminal size
-	if !term.IsTerminal(int(os.Stdout.Fd())) {
-		return nil, errors.Errorf("Not an expected terminal environment cannot get terminal size")
+	stdoutIsTerm := term.IsTerminal(int(os.Stdout.Fd()))
+	stdErrIsTerm := term.IsTerminal(int(os.Stderr.Fd()))
+	sizeErr := errors.Errorf("Not an expected terminal environment cannot get terminal size")
+	if !(stdoutIsTerm || stdErrIsTerm) {
+		return nil, sizeErr
 	}
 	size, err := getCurrentTerminalSize(os.Stdout)
 	if err != nil {
@@ -88,12 +92,23 @@ func NewTerminal() (*Terminal, error) {
 		size:          size,
 		listeners:     []ConditionalListener{},
 		fallbacks:     []Listener{},
-		stdin:         &stdin{realFile: os.Stdin},
-		stdout:        &stdout{realFile: os.Stdout},
+		stdin:         os.Stdin,
+		stdout:        os.Stdout,
 		listenMutex:   &sync.Mutex{},
 		isDynamicSize: true,
+		stdinFd:       int(os.Stdin.Fd()),
+		terminalSizeCallBack: func() (Size, error) {
+			if stdErrIsTerm {
+				return getCurrentTerminalSize(os.Stderr)
+			} else if stdoutIsTerm {
+				return getCurrentTerminalSize(os.Stdout)
+			} else {
+				return Size{}, sizeErr
+			}
+		},
+		isTestTerminal: false,
 	}
-	return t, t.supportsRaw()
+	return t, t.supportsRaw(os.Stdin)
 }
 
 // NewFixedSizeTerminal creates a new terminal with a starting size, note that unless [Terminal.StartRaw] is
@@ -104,8 +119,8 @@ func NewFixedSizeTerminal(s Size) (*Terminal, error) {
 		size:          s,
 		listeners:     []ConditionalListener{},
 		fallbacks:     []Listener{},
-		stdin:         &stdin{realFile: os.Stdin},
-		stdout:        &stdout{realFile: os.Stdout},
+		stdin:         os.Stdin,
+		stdout:        os.Stdout,
 		listenMutex:   &sync.Mutex{},
 		isDynamicSize: false,
 	}
@@ -133,9 +148,9 @@ func NewTestTerminal(stdinReader io.Reader, stdoutWriter io.Writer, terminalSize
 		size:                 size,
 		listeners:            []ConditionalListener{},
 		fallbacks:            []Listener{},
-		stdin:                &stdin{stubFileReader: stdinReader},
-		stdout:               &stdout{stubFileWriter: stdoutWriter},
-		terminalSizeCallBack: terminalSizeCallBack,
+		stdin:                stdinReader,
+		stdout:               stdoutWriter,
+		terminalSizeCallBack: func() (Size, error) { return terminalSizeCallBack(), nil },
 		isTestTerminal:       true,
 		isDynamicSize:        true,
 		listenMutex:          &sync.Mutex{},
@@ -153,14 +168,9 @@ func (t *Terminal) UpdateSize() error {
 	if !t.isDynamicSize {
 		return nil
 	}
-	if t.isTestTerminal {
-		t.size = t.terminalSizeCallBack()
-		return nil
-	} else {
-		var err error
-		t.size, err = getCurrentTerminalSize(t.stdout.realFile)
-		return err
-	}
+	var err error
+	t.size, err = t.terminalSizeCallBack()
+	return err
 }
 
 type Listener struct {
@@ -215,12 +225,11 @@ func (t *Terminal) StartRaw(
 ) (func(), error) {
 	restore := func() {}
 	if !t.isTestTerminal {
-		inFd := int(t.stdin.realFile.Fd())
-		oldState, err := term.MakeRaw(inFd)
+		oldState, err := term.MakeRaw(t.stdinFd)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to set terminal to raw mode")
 		}
-		restore = func() { _ = term.Restore(inFd, oldState) }
+		restore = func() { _ = term.Restore(t.stdinFd, oldState) }
 	}
 	ctrlCAction := func(rune) error {
 		t.Print(ansi.ShowCursor)
@@ -282,7 +291,7 @@ func (t *Terminal) Print(s string) error {
 // Write will print the passed bytes to the stdout controlled by the terminal, returning the standard number
 // of bytes written and error.
 func (t *Terminal) Write(b []byte) (int, error) {
-	return t.stdout.write(b)
+	return t.stdout.Write(b)
 }
 
 type listenResult struct {
@@ -322,7 +331,6 @@ func (t *Terminal) beingListening(ctx context.Context) {
 			heard := string(buffer[:received.n])
 			slog.Debug("got keyboard input", "received", heard)
 			for _, r := range heard {
-				// TODO document multiple valid listeners - especially ctrl-C interactions
 				t.processListenedRune(r)
 			}
 			// if we don't have the processing signal this clear would be racey against stdin.
@@ -368,7 +376,7 @@ func (t *Terminal) listen(
 			return
 		default:
 			// We "listen" on the stdin waiting for user input.
-			n, readErr := t.stdin.read(buffer)
+			n, readErr := t.stdin.Read(buffer)
 			listenChannel <- listenResult{n: n, err: readErr}
 			// Now wait for the main loop to be done with that last read
 			<-processingChannel
@@ -383,8 +391,8 @@ func getCurrentTerminalSize(file *os.File) (Size, error) {
 	return Size{Height: h, Width: w}, errors.Wrap(err, "failed to get terminal size")
 }
 
-func (t *Terminal) supportsRaw() error {
-	inFd := int(t.stdin.realFile.Fd())
+func (t *Terminal) supportsRaw(file *os.File) error {
+	inFd := int(file.Fd())
 	oldState, makeRawErr := term.MakeRaw(inFd)
 	var restoreErr error
 	if oldState != nil {

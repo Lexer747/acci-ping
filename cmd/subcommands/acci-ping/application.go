@@ -281,8 +281,11 @@ func startCPUProfiling(cpuprofile string) func() {
 	check.NoErr(err, "could not create CPU profile")
 	err = pprof.StartCPUProfile(f)
 	check.NoErr(err, "could not start CPU profile")
+	slog.Debug("Started CPU profile", "path", cpuprofile)
 	return func() {
+		slog.Debug("Writing CPU profile", "path", cpuprofile)
 		pprof.StopCPUProfile()
+		check.NoErr(f.Sync(), "failed to Sync profile")
 		check.NoErr(f.Close(), "failed to close profile")
 	}
 }

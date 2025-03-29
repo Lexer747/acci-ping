@@ -13,6 +13,8 @@ import (
 	"strings"
 )
 
+// Map will create a new slice of type [OUT] from which every element comes from [slice] after the function
+// [f] has been applied to it.
 func Map[IN, OUT any, S ~[]IN](slice S, f func(IN) OUT) []OUT {
 	ret := make([]OUT, len(slice))
 	for i, in := range slice {
@@ -21,15 +23,13 @@ func Map[IN, OUT any, S ~[]IN](slice S, f func(IN) OUT) []OUT {
 	return ret
 }
 
+// OneOf as of go1.24 is simply a wrapper around [slices.ContainsFunc]. Reporting whether at least one element
+// e of slice satisfies f(e).
 func OneOf[S ~[]T, T any](slice S, f func(T) bool) bool {
-	for _, item := range slice {
-		if f(item) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(slice, f)
 }
 
+// AllOf reports whether all elements e of [slice] satisfy f(e).
 func AllOf[S ~[]T, T any](slice S, f func(T) bool) bool {
 	for _, item := range slice {
 		if !f(item) {
@@ -39,6 +39,8 @@ func AllOf[S ~[]T, T any](slice S, f func(T) bool) bool {
 	return true
 }
 
+// Fold is a Left fold over the [slice] of e, applying f(base, e) to every element and returning the final
+// [OUT] accumulation.
 func Fold[IN, OUT any, S ~[]IN](slice S, base OUT, f func(IN, OUT) OUT) OUT {
 	ret := base
 	for _, in := range slice {
@@ -47,6 +49,8 @@ func Fold[IN, OUT any, S ~[]IN](slice S, base OUT, f func(IN, OUT) OUT) OUT {
 	return ret
 }
 
+// Shuffle uses [rand.Shuffle] to shuffle all the elements of the [slice] and return a shuffled [clone] of the
+// input.
 func Shuffle[S ~[]T, T any](slice S) S {
 	ret := slices.Clone(slice)
 	shuf := func(i, j int) {
@@ -58,10 +62,14 @@ func Shuffle[S ~[]T, T any](slice S) S {
 	return ret
 }
 
+// Join is a stringifier over the slice of [fmt.Stringer] elements, calling String on each one and joining them
+// all with the separator.
 func Join[S ~[]T, T fmt.Stringer](slice S, sep string) string {
 	return strings.Join(Map(slice, T.String), sep)
 }
 
+// Remove will remove the elements from the [slice], if no elements are found in the [slice] then a shallow
+// copy is returned.
 func Remove[S ~[]T, T comparable](slice S, elements ...T) S {
 	toDelete := map[T]struct{}{}
 	for _, t := range elements {

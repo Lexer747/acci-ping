@@ -1,4 +1,4 @@
 #!/bin/bash
 set -eux
-go run github.com/Lexer747/acci-ping drawframe -cpuprofile cpu.prof "$1"
-pprof -http=localhost:9999 cpu.prof
+acci-ping drawframe -cpuprofile cpu.prof -memprofile mem.prof "$1"
+go tool pprof -http=localhost:9999 cpu.prof

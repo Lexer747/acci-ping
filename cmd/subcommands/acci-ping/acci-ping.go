@@ -59,10 +59,10 @@ func GetFlags() *Config {
 
 func RunAcciPing(c *Config) {
 	check.Check(c.Parsed(), "flags not parsed")
-	closeCPUProfile := startCPUProfiling(*c.cpuprofile)
-	defer closeCPUProfile()
 	closeLogFile := initLogging(*c.logFile)
 	defer closeLogFile()
+	closeCPUProfile := startCPUProfiling(*c.cpuprofile)
+	defer closeCPUProfile()
 
 	app := Application{}
 	ctx, cancelFunc := context.WithCancelCause(context.Background())

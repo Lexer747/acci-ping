@@ -9,19 +9,20 @@ package graph
 import (
 	"fmt"
 
-	t "github.com/Lexer747/acci-ping/graph/terminal/typography"
+	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/graph/terminal/typography"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 
-func solve(x []int, y []int) []string {
+func solve(x []int, y []int) []gradient {
 	check.Check(len(x) == len(y), "x and y should be equal len")
 	if len(x) <= 1 {
-		return []string{}
+		return []gradient{}
 	}
 	if len(x) == 2 {
-		return []string{gradientSolve(x[0], x[1], y[0], y[1])}
+		return []gradient{gradientSolve(x[0], x[1], y[0], y[1])}
 	}
-	result := make([]string, len(x)-1)
+	result := make([]gradient, len(x)-1)
 	xDirs := make([]direction, len(x)-1)
 	yDirs := make([]direction, len(x)-1)
 	xEqualsCount := 0
@@ -38,7 +39,7 @@ func solve(x []int, y []int) []string {
 		}
 	}
 	if yEqualsCount > len(yDirs)/2 {
-		solve := []string{}
+		solve := []gradient{}
 		var specific bool
 		for i := range len(xDirs) - 1 {
 			if specific {
@@ -53,7 +54,7 @@ func solve(x []int, y []int) []string {
 		}
 		result[len(result)-1] = solve[1]
 	} else {
-		solve := []string{}
+		solve := []gradient{}
 		for i := range len(xDirs) - 1 {
 			solve = solveTwoDirections(xDirs[i], yDirs[i], xDirs[i+1], yDirs[i+1])
 			result[i] = solve[0]
@@ -64,62 +65,62 @@ func solve(x []int, y []int) []string {
 	return result
 }
 
-func gradientSolve(beginX, beginY, endX, endY int) string {
+func gradientSolve(beginX, beginY, endX, endY int) gradient {
 	xDir := getDir(beginX, endX)
 	// y values are inverted
 	yDir := getDir(endY, beginY)
 	return solveDirections(xDir, yDir)
 }
 
-func solveShallowTwoDirections(firstX direction, firstY direction, secondX direction, secondY direction) (bool, []string) {
+func solveShallowTwoDirections(firstX direction, firstY direction, secondX direction, secondY direction) (bool, []gradient) {
 	first := solveDirections(firstX, firstY)
 	second := solveDirections(secondX, secondY)
 	switch {
-	case (first == "/" && second == "-") || (first == "/" && second == ""):
-		return true, []string{t.TopLine, t.BottomLine}
-	case (first == "\\" && second == "-") || (first == "\\" && second == ""):
-		return true, []string{t.BottomLine, t.TopLine}
-	case (first == "-" && second == "/") || (first == "" && second == "/"):
-		return false, []string{first, t.TopLine}
-	case (first == "-" && second == "\\") || (first == "" && second == "\\"):
-		return false, []string{first, t.BottomLine}
+	case (first == upSteep && second == horizontal) || (first == upSteep && second == nothing):
+		return true, []gradient{topLine, bottomLine}
+	case (first == downSteep && second == horizontal) || (first == downSteep && second == nothing):
+		return true, []gradient{bottomLine, topLine}
+	case (first == horizontal && second == upSteep) || (first == nothing && second == upSteep):
+		return false, []gradient{first, topLine}
+	case (first == horizontal && second == downSteep) || (first == nothing && second == downSteep):
+		return false, []gradient{first, bottomLine}
 	default:
-		return false, []string{first, second}
+		return false, []gradient{first, second}
 	}
 }
 
-func solveTwoDirections(firstX direction, firstY direction, secondX direction, secondY direction) []string {
+func solveTwoDirections(firstX direction, firstY direction, secondX direction, secondY direction) []gradient {
 	first := solveDirections(firstX, firstY)
 	second := solveDirections(secondX, secondY)
 	switch {
-	case first == "-" && second == t.Vertical:
-		return []string{" ", t.Vertical}
-	case first == t.Vertical && second == "-":
-		return []string{t.Vertical, " "}
+	case first == horizontal && second == vertical:
+		return []gradient{gap, vertical}
+	case first == vertical && second == horizontal:
+		return []gradient{vertical, gap}
 	default:
-		return []string{first, second}
+		return []gradient{first, second}
 	}
 }
 
-func solveDirections(xDir direction, yDir direction) string {
+func solveDirections(xDir direction, yDir direction) gradient {
 	if xDir == positive && yDir == positive {
-		return "/"
+		return upSteep
 	} else if xDir == equal && yDir == positive {
-		return t.Vertical
+		return vertical
 	} else if xDir == negative && yDir == positive {
-		return "\\"
+		return downSteep
 	}
 	if (xDir == positive || xDir == negative) && yDir == equal {
-		return "-"
+		return horizontal
 	} else if xDir == equal && yDir == equal {
-		return ""
+		return nothing
 	}
 	if xDir == positive && yDir == negative {
-		return "\\"
+		return downSteep
 	} else if xDir == equal && yDir == negative {
-		return t.Vertical
+		return vertical
 	} else if xDir == negative && yDir == negative {
-		return "/"
+		return upSteep
 	}
 	panic(fmt.Sprintf("Case not covered %d %d", xDir, yDir))
 }
@@ -142,3 +143,44 @@ const (
 	equal    direction = 0
 	negative direction = -1
 )
+
+type gradient int
+
+const (
+	nothing gradient = -1
+
+	gap gradient = 1
+
+	upSteep    gradient = 2
+	vertical   gradient = 3
+	horizontal gradient = 4
+	downSteep  gradient = 5
+
+	topLine    gradient = 6
+	bottomLine gradient = 7
+)
+
+func (g gradient) draw() string {
+	ret := ""
+	switch g {
+	case nothing:
+		return ret
+	case gap:
+		ret = " "
+	case upSteep:
+		ret = "/"
+	case vertical:
+		ret = typography.Vertical
+	case horizontal:
+		ret = "-"
+	case downSteep:
+		ret = `\`
+	case topLine:
+		ret = typography.TopLine
+	case bottomLine:
+		ret = typography.BottomLine
+	default:
+		panic(fmt.Sprintf("unexpected gradient %d", g))
+	}
+	return ansi.Gray(ret)
+}

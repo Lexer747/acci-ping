@@ -36,9 +36,6 @@ func (b *Buffer) Get(z Index) *bytes.Buffer {
 
 // Reset will reset all the buffers so that they no longer contain the last frame but are all empty.
 func (b *Buffer) Reset(toReset ...Index) {
-	// TODO an optimization here is too not reset at frame start but just reset the writer pointer per frame
-	// to the start of the buffer then before drawing clear all the bytes from the writer pointer till the end
-	// of the buffer.
 	for _, idx := range toReset {
 		b.Get(idx).Reset()
 	}
@@ -46,12 +43,13 @@ func (b *Buffer) Reset(toReset ...Index) {
 
 var (
 	BarIndex      = newIndex()
+	DroppedIndex  = newIndex()
 	DataIndex     = newIndex()
 	GradientIndex = newIndex()
+	HelpIndex     = newIndex()
 	KeyIndex      = newIndex()
 	SpinnerIndex  = newIndex()
 	ToastIndex    = newIndex()
-	HelpIndex     = newIndex()
 	XAxisIndex    = newIndex()
 	YAxisIndex    = newIndex()
 )
@@ -60,7 +58,10 @@ var (
 var PaintOrder = []Index{
 	// gradient is on the bottom since it's the most "fluffy" part of the presentation, it's interpolated data
 	GradientIndex,
+	// bars are the span indicators, telling the user when a break in the continuous time axis occurs.
 	BarIndex,
+	// dropped bars are the dropped packets indicators.
+	DroppedIndex,
 	// bars should be overwritten by data and axis
 	DataIndex,
 	YAxisIndex,

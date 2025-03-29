@@ -83,6 +83,7 @@ func (g *Graph) computeFrame(timeBetweenFrames time.Duration, drawSpinner bool) 
 		g,
 		g.drawingBuffer.Get(draw.GradientIndex),
 		g.drawingBuffer.Get(draw.DataIndex),
+		g.drawingBuffer.Get(draw.DroppedIndex),
 		g.drawingBuffer.Get(draw.KeyIndex),
 		g.data.LockFreeIter(),
 		g.data.LockFreeRuns(),
@@ -196,12 +197,9 @@ func (g gradientState) draw() bool {
 	return g.lastGoodIndex != -1
 }
 
-var drop = ansi.Red(typography.Block)
-var dropFiller = ansi.Red(typography.LightBlock)
-
 func computeFrame(
 	g *Graph,
-	toWriteGradientTo, toWriteTo, toWriteKeyTo *bytes.Buffer,
+	toWriteGradientTo, toWriteTo, toWriteDroppedTo, toWriteKeyTo *bytes.Buffer,
 	iter *graphdata.Iter,
 	runs *data.Runs,
 	xAxis drawingXAxis,
@@ -218,29 +216,21 @@ func computeFrame(
 		toWriteTo.WriteString(ansi.CursorPosition(centreY, centreX) + single + " " + point.Duration.String())
 		return
 	}
-	droppedBar, droppedFiller := makeDroppedPacketIndicators(yAxis.stats.PacketsDropped, s)
 
 	// Now iterate over all the individual data points and add them to the graph
-
-	if shouldGradient(runs) {
-		drawGradients(g, toWriteGradientTo, iter, xAxis, yAxis, s)
-	}
-
 	lastWasDropped := false
 	lastDroppedTerminalX := -1
-	window := newDrawWindow(iter.Total, len(xAxis.spans), g.debugStrict)
+	window := newDrawWindow(s, len(xAxis.spans), g.debugStrict)
 	xAxisIter := xAxis.NewIter()
 	for i := range iter.Total {
 		p := iter.Get(i)
 		span := xAxisIter.Get(p)
 		x := getX(p.Timestamp, span, yAxis, s)
-		// TODO move the bars into the [drawWindow] so that the labels are on-top, also so that we don't
-		// re-draw more than we need to.
 		if p.Dropped() {
-			toWriteTo.WriteString(ansi.CursorPosition(2, x) + droppedBar)
+			window.addDroppedBar(x, s.Height, false)
 			if lastWasDropped {
 				for i := min(lastDroppedTerminalX, x) + 1; i < max(lastDroppedTerminalX, x); i++ {
-					toWriteTo.WriteString(ansi.CursorPosition(2, i) + droppedFiller)
+					window.addDroppedBar(i, s.Height, true)
 				}
 			}
 			lastWasDropped = true
@@ -253,17 +243,20 @@ func computeFrame(
 			x > 0 && x <= s.Width && y > 0 && y <= s.Height,
 			"(x, y) {%d, %d} [%s, %s] coordinate out of terminal {%s} bounds. Index: %d",
 			x, y,
-			p.Timestamp.String(), p.Duration.String(),
-			s.String(), i,
+			p.Timestamp, p.Duration,
+			s, i,
 		)
 		window.addPoint(p, span.pingStats, yAxis.stats, span.width, x, y, centreX)
 	}
-	window.draw(toWriteTo)
+	if shouldGradient(runs) {
+		drawGradients(g, window, iter, xAxis, yAxis, s)
+	}
+	window.draw(toWriteTo, toWriteGradientTo, toWriteDroppedTo)
 	toWriteKeyTo.WriteString(ansi.CursorPosition(s.Height-1, yAxis.labelSize+1))
 	window.getKey(toWriteKeyTo)
 }
 
-func drawGradients(g *Graph, toWriteTo *bytes.Buffer, iter *graphdata.Iter, xAxis drawingXAxis, yAxis drawingYAxis, s terminal.Size) {
+func drawGradients(g *Graph, dw *drawWindow, iter *graphdata.Iter, xAxis drawingXAxis, yAxis drawingYAxis, s terminal.Size) {
 	gs := gradientState{}
 	xAxisIter := xAxis.NewIter()
 
@@ -275,13 +268,12 @@ func drawGradients(g *Graph, toWriteTo *bytes.Buffer, iter *graphdata.Iter, xAxi
 		}
 		span := xAxisIter.Get(p)
 		x, y := translate(p, span, yAxis, s)
-		g.checkf(x <= s.Width && y <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", x, y, s.String())
+		g.checkf(x <= s.Width && y <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", x, y, s)
 		if gs.draw() && !iter.IsLast(i) {
 			if span == gs.lastGoodSpan {
 				lastP := iter.Get(gs.lastGoodIndex)
 				drawGradient(
-					g,
-					toWriteTo,
+					g, dw,
 					span, yAxis,
 					x, y,
 					p,
@@ -294,16 +286,6 @@ func drawGradients(g *Graph, toWriteTo *bytes.Buffer, iter *graphdata.Iter, xAxi
 		}
 		gs = gs.set(i, x, y, span)
 	}
-}
-
-func makeDroppedPacketIndicators(droppedPackets uint64, s terminal.Size) (string, string) {
-	droppedBar := ""
-	droppedFillerBar := ""
-	if droppedPackets > 0 {
-		droppedBar = makeBar(drop, s, false)
-		droppedFillerBar = makeBar(dropFiller, s, false)
-	}
-	return droppedBar, droppedFillerBar
 }
 
 // A bar requires you start at the top of the terminal, general to draw a bar at coord x, do
@@ -322,7 +304,7 @@ func makeBar(repeating string, s terminal.Size, touchAxis bool) string {
 
 func drawGradient(
 	g *Graph,
-	toWriteTo *bytes.Buffer,
+	dw *drawWindow,
 	xAxis *XAxisSpanInfo,
 	yAxis drawingYAxis,
 	x, y int,
@@ -345,13 +327,13 @@ func drawGradient(
 		interpolatedStamp := lastGood.Timestamp.Add(time.Duration(toDraw * stepSizeX))
 		p := ping.PingDataPoint{Duration: interpolatedDuration, Timestamp: interpolatedStamp}
 		cursorX, cursorY := translate(p, xAxis, yAxis, s)
-		g.checkf(cursorX <= s.Width && cursorY <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", cursorY, cursorX, s.String())
+		g.checkf(cursorX <= s.Width && cursorY <= s.Height, "Computed coord out of bounds (%d,%d) vs %q", cursorY, cursorX, s)
 		pointsX = append(pointsX, cursorX)
 		pointsY = append(pointsY, cursorY)
 	}
-	gradient := solve(pointsX, pointsY)
-	for i, g := range gradient {
-		toWriteTo.WriteString(ansi.CursorPosition(pointsY[i], pointsX[i]) + ansi.Gray(g))
+	gradients := solve(pointsX, pointsY)
+	for i, gradient := range gradients {
+		dw.addGradient(pointsX[i], pointsY[i], gradient)
 	}
 }
 
@@ -359,7 +341,6 @@ func shouldGradient(runs *data.Runs) bool {
 	return runs.GoodPackets.Longest > 2
 }
 
-// TODO this has a bug when height is less than 12 and it renders no timestamps
 func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats, url string) drawingYAxis {
 	toWriteTo.Grow(size.Height)
 
@@ -368,8 +349,6 @@ func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats
 	gapSize := 2
 	if size.Height > 20 {
 		gapSize++
-	} else if size.Height < 12 {
-		gapSize--
 	}
 	durationSize := (gapSize * 3) / 2
 

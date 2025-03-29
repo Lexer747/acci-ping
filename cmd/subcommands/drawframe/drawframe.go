@@ -110,7 +110,7 @@ func do(path string, term *terminal.Terminal, profiling, debugStrict bool) {
 		panic(err.Error())
 	}
 
-	// TODO dont profile like this when on a folder.
+	// TODO dont profile like this when iterating over a folder of inputs.
 	if profiling {
 		timer := time.NewTimer(time.Second * 60)
 		running := true

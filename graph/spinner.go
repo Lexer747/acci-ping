@@ -21,13 +21,13 @@ var spinnerArray = [...]string{
 	typography.LowerLeftQuadrantCircularArc,
 }
 
-func spinner(s terminal.Size, i int, timeBetweenFrames time.Duration) string {
+func spinner(s terminal.Size, spinnerIndex int, timeBetweenFrames time.Duration) string {
 	// TODO refactor into a generic only paint me every X fps.
 	// We want 175ms between spinner updates
-	a := i
+	a := spinnerIndex
 	x := timeBetweenFrames.Milliseconds()
 	if x != 0 && int(175/x) != 0 {
-		a = i / int(175/x)
+		a = spinnerIndex / int(175/x)
 	}
 	return ansi.CursorPosition(1, s.Width-3) + ansi.Cyan(spinnerArray[a%len(spinnerArray)])
 }

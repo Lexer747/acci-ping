@@ -12,6 +12,7 @@ import (
 	"log/slog"
 
 	"github.com/Lexer747/acci-ping/graph/data"
+	"github.com/Lexer747/acci-ping/graph/terminal"
 	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
 	"github.com/Lexer747/acci-ping/graph/terminal/typography"
 	"github.com/Lexer747/acci-ping/ping"
@@ -39,9 +40,22 @@ type coords struct {
 // drawnData is the actual data we wish to draw, [isLabel] is an indirect pointer of sorts which tells the
 // overall library to look at the [drawWindow.labels] instead this draw data.
 type drawnData struct {
-	pingCount int
-	isLabel   bool
+	pingCount          int
+	gradient           gradient
+	isDroppedBar       bool
+	isDroppedBarFiller bool
+	isLabel            bool
 }
+
+type drawnDataType int
+
+const (
+	labelType              drawnDataType = 0
+	pingCountType          drawnDataType = 1
+	isDroppedBarType       drawnDataType = 2
+	isDroppedBarFillerType drawnDataType = 3
+	gradientType           drawnDataType = 4
+)
 
 type label struct {
 	coords
@@ -58,23 +72,36 @@ const (
 	green
 )
 
-func newDrawWindow(total int64, spans int, debugStrict bool) *drawWindow {
+func newDrawWindow(size terminal.Size, spans int, debugStrict bool) *drawWindow {
 	return &drawWindow{
-		cache:       make(map[coords]drawnData, int(total)),
+		cache:       make(map[coords]drawnData, size.Height*size.Width),
 		labels:      make([]label, 0, spans*2),
 		debugStrict: debugStrict,
 	}
 }
 
-func (dw *drawWindow) draw(toWriteTo *bytes.Buffer) {
+var drop = ansi.Red(typography.Block)
+var dropFiller = ansi.Red(typography.LightBlock)
+
+func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.Buffer) {
 	// These can be indeterministically (map order) drawn since we guarantee uniqueness of the coords,
 	// therefore meaning no map [drawnData] will ever contain the same coords which have different ping counts
 	for c, point := range dw.cache {
-		if point.isLabel {
-			// labels are drawn separately, but are in the cache for [addPoint]
+		switch {
+		case point.shouldDraw(labelType):
+			// labels are drawn separately, but are in the cache for the various addition methods
 			continue
+		case point.shouldDraw(pingCountType):
+			toWrite.WriteString(ansi.CursorPosition(c.y, c.x) + dw.getOverlap(c.x, c.y))
+		case point.shouldDraw(isDroppedBarType):
+			toWriteDropped.WriteString(ansi.CursorPosition(c.y, c.x) + drop)
+		case point.shouldDraw(isDroppedBarFillerType):
+			toWriteDropped.WriteString(ansi.CursorPosition(c.y, c.x) + dropFiller)
+		case point.shouldDraw(gradientType):
+			toWriteGradient.WriteString(ansi.CursorPosition(c.y, c.x) + point.gradient.draw())
+		default:
+			dw.checkf(false, "failed to draw point: %+v", point)
 		}
-		toWriteTo.WriteString(ansi.CursorPosition(c.y, c.x) + dw.getOverlap(c.x, c.y))
 	}
 	// If these are drawn indeterministically then we will get shimmer as labels may be fighting for Z-Preference
 	for _, l := range dw.labels {
@@ -87,9 +114,9 @@ func (dw *drawWindow) draw(toWriteTo *bytes.Buffer) {
 		if l.leftJustify {
 			// ensure that we don't write to a negative coord should the terminal be very small.
 			xPos := max(1, l.x-len(l.text))
-			toWriteTo.WriteString(ansi.CursorPosition(l.y, xPos) + addColour(l.text+" "+l.symbol))
+			toWrite.WriteString(ansi.CursorPosition(l.y, xPos) + addColour(l.text+" "+l.symbol))
 		} else /* rightJustify */ {
-			toWriteTo.WriteString(ansi.CursorPosition(l.y, l.x) + addColour(l.symbol+" "+l.text))
+			toWrite.WriteString(ansi.CursorPosition(l.y, l.x) + addColour(l.symbol+" "+l.text))
 		}
 	}
 }
@@ -135,6 +162,38 @@ func (dw *drawWindow) addPoint(
 	if needsLabel {
 		label := p.Duration.String()
 		dw.addLabel(x, y, leftJustify, symbol, label, colour)
+	}
+}
+
+func (dw *drawWindow) addGradient(x, y int, g gradient) {
+	c := coords{x, y}
+	if drawData, found := dw.cache[c]; found {
+		if drawData.isLabel || drawData.pingCount > 0 {
+			return
+		}
+	}
+	dw.cache[c] = drawnData{gradient: g}
+}
+
+func (dw *drawWindow) addDroppedBar(x, height int, filler bool) {
+	var dd drawnData
+	var t drawnDataType
+	if filler {
+		dd = drawnData{isDroppedBarFiller: true}
+		t = isDroppedBarFillerType
+	} else {
+		dd = drawnData{isDroppedBar: true}
+		t = isDroppedBarType
+	}
+	for y := 2; y < height-1; y++ {
+		c := coords{x, y}
+		if drawData, found := dw.cache[c]; found {
+			if drawData.shouldWrite(t) {
+				dw.cache[c] = dd
+			}
+		} else {
+			dw.cache[c] = dd
+		}
 	}
 }
 
@@ -246,5 +305,30 @@ func (dw *drawWindow) getKey(toWriteTo *bytes.Buffer) {
 			single+" = %d "+bar+" "+few+" = %d-%d    ",
 			fewThreshold, fewThreshold+1, manyThreshold)
 		return
+	}
+}
+
+func (dd drawnData) shouldWrite(t drawnDataType) bool {
+	return t < dd.infer()
+}
+
+func (dd drawnData) shouldDraw(t drawnDataType) bool {
+	return t == dd.infer()
+}
+
+func (dd drawnData) infer() drawnDataType {
+	switch {
+	case dd.isLabel:
+		return labelType
+	case dd.pingCount > 0:
+		return pingCountType
+	case dd.gradient != 0:
+		return gradientType
+	case dd.isDroppedBar:
+		return isDroppedBarType
+	case dd.isDroppedBarFiller:
+		return isDroppedBarFillerType
+	default:
+		panic(fmt.Sprintf("unexpected drawnData %+v", dd))
 	}
 }

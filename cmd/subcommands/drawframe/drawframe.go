@@ -10,12 +10,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
-	"runtime/pprof"
 	"time"
 
 	"github.com/Lexer747/acci-ping/draw"
@@ -24,6 +20,7 @@ import (
 	"github.com/Lexer747/acci-ping/graph/data"
 	"github.com/Lexer747/acci-ping/graph/terminal"
 	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/exit"
 )
@@ -35,12 +32,14 @@ type Config struct {
 	memprofile  *string
 	termSize    *string
 
+	*application.BuildInfo
 	*flag.FlagSet
 }
 
-func GetFlags() *Config {
+func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
 	ret := &Config{
+		BuildInfo:   info,
 		cpuprofile:  f.String("cpuprofile", "", "write cpu profile to `file`"),
 		debugStrict: f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
 		logFile:     f.String("l", "", "write logs to `file`. (default no logs written)"),
@@ -61,11 +60,12 @@ func GetFlags() *Config {
 
 func RunDrawFrame(c *Config) {
 	check.Check(c.Parsed(), "flags not parsed")
-	closeProfile := startCPUProfiling(*c.cpuprofile)
-	defer closeProfile()
-	defer concludeMemProfile(*c.memprofile)
-	closeLogFile := initLogging(*c.logFile)
+	closeLogFile := application.InitLogging(*c.logFile, c.BuildInfo)
 	defer closeLogFile()
+	closeCPUProfile := application.InitCPUProfiling(*c.cpuprofile)
+	defer closeCPUProfile()
+	closeMemProfile := application.InitMemProfile(*c.memprofile)
+	defer closeMemProfile()
 	profiling := *c.cpuprofile != "" || *c.memprofile != ""
 
 	toPrint := c.Args()
@@ -142,58 +142,4 @@ func printGraph(term *terminal.Terminal, d *data.Data, debugStrict bool) {
 	if err != nil {
 		panic(err.Error())
 	}
-}
-
-func concludeMemProfile(path string) {
-	if path != "" {
-		f, err := os.Create(path)
-		if err != nil {
-			panic("could not create memory profile: " + err.Error())
-		}
-		defer f.Close()
-		runtime.GC() // get up-to-date statistics
-		if err := pprof.WriteHeapProfile(f); err != nil {
-			panic("could not write memory profile: " + err.Error())
-		}
-	}
-}
-
-func startCPUProfiling(path string) func() {
-	if path != "" {
-		runtime.SetCPUProfileRate(1000000)
-		f, err := os.Create(path)
-		if err != nil {
-			panic("could not create CPU profile: " + err.Error())
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			panic("could not start CPU profile: " + err.Error())
-		}
-		return func() {
-			pprof.StopCPUProfile()
-			f.Close()
-		}
-	}
-	return func() {}
-}
-
-func initLogging(file string) func() {
-	if file != "" {
-		f, err := os.Create(file)
-		check.NoErr(err, "could not create Log file")
-		h := slog.NewTextHandler(f, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		})
-		slog.SetDefault(slog.New(h))
-		slog.Debug("Logging started", "file", file)
-		return func() {
-			slog.Debug("Logging finished, closing", "file", file)
-			check.NoErr(f.Close(), "failed to close log file")
-		}
-	}
-	// If no file is specified we want to stop all logging
-	h := slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-		Level: slog.LevelError,
-	})
-	slog.SetDefault(slog.New(h))
-	return func() {}
 }

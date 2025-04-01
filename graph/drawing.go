@@ -16,6 +16,7 @@ import (
 
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/graph/data"
+	"github.com/Lexer747/acci-ping/graph/gradient"
 	"github.com/Lexer747/acci-ping/graph/graphdata"
 	"github.com/Lexer747/acci-ping/graph/terminal"
 	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
@@ -316,7 +317,7 @@ func drawGradient(
 ) {
 	gradientsToDrawX := float64(numeric.Abs(lastGoodTerminalWidth - x))
 	gradientsToDrawY := float64(numeric.Abs(lastGoodTerminalHeight - y))
-	gradientsToDraw := math.Sqrt(math.Pow(gradientsToDrawX, 2) + math.Pow(gradientsToDrawY, 2))
+	gradientsToDraw := math.Sqrt((gradientsToDrawX * gradientsToDrawX) + (gradientsToDrawY * gradientsToDrawY))
 	stepSizeY := float64(current.Duration-lastGood.Duration) / gradientsToDraw
 	stepSizeX := float64(current.Timestamp.Sub(lastGood.Timestamp)) / gradientsToDraw
 
@@ -331,7 +332,7 @@ func drawGradient(
 		pointsX = append(pointsX, cursorX)
 		pointsY = append(pointsY, cursorY)
 	}
-	gradients := solve(pointsX, pointsY)
+	gradients := gradient.Solve(pointsX, pointsY)
 	for i, gradient := range gradients {
 		dw.addGradient(pointsX[i], pointsY[i], gradient)
 	}

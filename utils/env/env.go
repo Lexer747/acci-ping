@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
-//nolint:stylecheck
+//nolint:staticcheck
 package env
 
 import (

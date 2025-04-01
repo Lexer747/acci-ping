@@ -30,7 +30,7 @@ func init() {
 var path string
 
 func preBuild() (string, error) {
-	build := exec.Command("/bin/bash", "./build.sh", "unit-tests")
+	build := exec.Command("/bin/bash", "./tools/build.sh", "unit-tests")
 	build.Dir = "../" + build.Dir
 	// TODO support other CI envs
 	return "./../out/linux/amd64/", build.Run()

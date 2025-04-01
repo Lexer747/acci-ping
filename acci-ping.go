@@ -9,6 +9,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	acciping "github.com/Lexer747/acci-ping/cmd/subcommands/acci-ping"
@@ -16,8 +17,19 @@ import (
 	"github.com/Lexer747/acci-ping/cmd/subcommands/ping"
 	"github.com/Lexer747/acci-ping/cmd/subcommands/rawdata"
 	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/exit"
+)
+
+// these looking more bash variables helps clue me into where these actually come from which is build time linking, see build.sh.
+//
+//nolint:staticcheck
+var (
+	COMMIT     string
+	GO_VERSION string
+	BRANCH     string
+	TIMESTAMP  string
 )
 
 var programName = ansi.Green("acci-ping")
@@ -53,10 +65,11 @@ var mainDescription = programName + " can run be with no arguments to start the 
 	" To exit simply kill the program via the normal control-c."
 
 func main() {
+	info := application.MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP)
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case drawframeString:
-			df := drawframe.GetFlags()
+			df := drawframe.GetFlags(info)
 			FlagParseError(df.Parse(os.Args[2:]))
 			drawframe.RunDrawFrame(df)
 			exit.Success()
@@ -74,20 +87,24 @@ func main() {
 			// fallthrough
 		}
 	}
-	a := acciping.GetFlags()
+	a := acciping.GetFlags(info)
 	a.Usage = func() {
-		fmt.Fprint(a.Output(), "  "+mainDescription+"\n\n")
-		for _, cmd := range commandsUsage {
-			fmt.Fprint(a.Output(), "  "+cmd.subcommandName+"\n")
-			fmt.Fprint(a.Output(), "      "+cmd.description+"\n")
-		}
-		fmt.Fprintf(a.Output(), "call any of the above subcommands with --help for extra details on those commands.\n")
-		fmt.Fprint(a.Output(), "\n"+programName+" arguments:\n")
+		subCommandUsage(a.Output())
 		a.PrintDefaults()
 	}
 	FlagParseError(a.Parse(os.Args[1:]))
 	acciping.RunAcciPing(a)
 	exit.Success()
+}
+
+func subCommandUsage(w io.Writer) {
+	fmt.Fprint(w, "  "+mainDescription+"\n\n")
+	for _, cmd := range commandsUsage {
+		fmt.Fprint(w, "  "+cmd.subcommandName+"\n")
+		fmt.Fprint(w, "      "+cmd.description+"\n")
+	}
+	fmt.Fprintf(w, "call any of the above subcommands with --help for extra details on those commands.\n")
+	fmt.Fprint(w, "\n"+programName+" arguments:\n")
 }
 
 func FlagParseError(err error) {

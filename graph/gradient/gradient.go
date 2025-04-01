@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
-package graph
+package gradient
 
 import (
 	"fmt"
@@ -14,22 +14,22 @@ import (
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 
-func solve(x []int, y []int) []gradient {
+func Solve(x []int, y []int) []Solution {
 	check.Check(len(x) == len(y), "x and y should be equal len")
 	if len(x) <= 1 {
-		return []gradient{}
+		return []Solution{}
 	}
 	if len(x) == 2 {
-		return []gradient{gradientSolve(x[0], x[1], y[0], y[1])}
+		return []Solution{gradientSolve(x[0], y[0], x[1], y[1])}
 	}
-	result := make([]gradient, len(x)-1)
+	result := make([]Solution, len(x)-1)
 	xDirs := make([]direction, len(x)-1)
 	yDirs := make([]direction, len(x)-1)
 	xEqualsCount := 0
 	yEqualsCount := 0
 	for i := range len(x) - 1 {
 		xDirs[i] = getDir(x[i], x[i+1])
-		// // y values are inverted
+		// y values are inverted
 		yDirs[i] = getDir(y[i+1], y[i])
 		if xDirs[i] == equal {
 			xEqualsCount++
@@ -39,7 +39,7 @@ func solve(x []int, y []int) []gradient {
 		}
 	}
 	if yEqualsCount > len(yDirs)/2 {
-		solve := []gradient{}
+		solve := []Solution{}
 		var specific bool
 		for i := range len(xDirs) - 1 {
 			if specific {
@@ -54,7 +54,7 @@ func solve(x []int, y []int) []gradient {
 		}
 		result[len(result)-1] = solve[1]
 	} else {
-		solve := []gradient{}
+		solve := []Solution{}
 		for i := range len(xDirs) - 1 {
 			solve = solveTwoDirections(xDirs[i], yDirs[i], xDirs[i+1], yDirs[i+1])
 			result[i] = solve[0]
@@ -65,44 +65,44 @@ func solve(x []int, y []int) []gradient {
 	return result
 }
 
-func gradientSolve(beginX, beginY, endX, endY int) gradient {
+func gradientSolve(beginX, beginY, endX, endY int) Solution {
 	xDir := getDir(beginX, endX)
 	// y values are inverted
 	yDir := getDir(endY, beginY)
 	return solveDirections(xDir, yDir)
 }
 
-func solveShallowTwoDirections(firstX direction, firstY direction, secondX direction, secondY direction) (bool, []gradient) {
+func solveShallowTwoDirections(firstX direction, firstY direction, secondX direction, secondY direction) (bool, []Solution) {
 	first := solveDirections(firstX, firstY)
 	second := solveDirections(secondX, secondY)
 	switch {
 	case (first == upSteep && second == horizontal) || (first == upSteep && second == nothing):
-		return true, []gradient{topLine, bottomLine}
+		return true, []Solution{topLine, bottomLine}
 	case (first == downSteep && second == horizontal) || (first == downSteep && second == nothing):
-		return true, []gradient{bottomLine, topLine}
+		return true, []Solution{bottomLine, topLine}
 	case (first == horizontal && second == upSteep) || (first == nothing && second == upSteep):
-		return false, []gradient{first, topLine}
+		return false, []Solution{first, topLine}
 	case (first == horizontal && second == downSteep) || (first == nothing && second == downSteep):
-		return false, []gradient{first, bottomLine}
+		return false, []Solution{first, bottomLine}
 	default:
-		return false, []gradient{first, second}
+		return false, []Solution{first, second}
 	}
 }
 
-func solveTwoDirections(firstX direction, firstY direction, secondX direction, secondY direction) []gradient {
+func solveTwoDirections(firstX direction, firstY direction, secondX direction, secondY direction) []Solution {
 	first := solveDirections(firstX, firstY)
 	second := solveDirections(secondX, secondY)
 	switch {
 	case first == horizontal && second == vertical:
-		return []gradient{gap, vertical}
+		return []Solution{gap, vertical}
 	case first == vertical && second == horizontal:
-		return []gradient{vertical, gap}
+		return []Solution{vertical, gap}
 	default:
-		return []gradient{first, second}
+		return []Solution{first, second}
 	}
 }
 
-func solveDirections(xDir direction, yDir direction) gradient {
+func solveDirections(xDir direction, yDir direction) Solution {
 	if xDir == positive && yDir == positive {
 		return upSteep
 	} else if xDir == equal && yDir == positive {
@@ -144,23 +144,23 @@ const (
 	negative direction = -1
 )
 
-type gradient int
+type Solution int
 
 const (
-	nothing gradient = -1
+	nothing Solution = -1
 
-	gap gradient = 1
+	gap Solution = 1
 
-	upSteep    gradient = 2
-	vertical   gradient = 3
-	horizontal gradient = 4
-	downSteep  gradient = 5
+	upSteep    Solution = 2
+	vertical   Solution = 3
+	horizontal Solution = 4
+	downSteep  Solution = 5
 
-	topLine    gradient = 6
-	bottomLine gradient = 7
+	topLine    Solution = 6
+	bottomLine Solution = 7
 )
 
-func (g gradient) draw() string {
+func (g Solution) Draw() string {
 	ret := ""
 	switch g {
 	case nothing:

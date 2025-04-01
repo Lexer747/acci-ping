@@ -1,61 +1,9 @@
-# Default configuration copied from https://raw.githubusercontent.com/golangci/golangci-lint/master/.golangci.example.yml
-# and tweaked.
+# Default configuration copied from https://github.com/golangci/golangci-lint/blob/v1.63.4/.golangci.reference.yml
+# and tweaked. Then also migrated to v2.
 
-# options for analysis running
-run:
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
-  timeout: 20m
-
-  # sorts results by: filepath, line and column
-  sort-results: true
-
-linters-settings:
-  lll:
-    # Max line length, lines longer will be reported.
-    # '\t' is counted as 1 character by default, and can be changed with the tab-width option.
-    # Default: 120.
-    line-length: 140
-    tab-width: 2
-  depguard:
-    rules:
-      prevent_unmaintained_packages:
-        list-mode: lax # allow unless explicitly denied
-        files:
-          - $all
-          - "!$test"
-        allow:
-          - $gostd
-        deny:
-          - pkg: golang.org/x/net/context
-            desc: "now part of std, import 'context' instead"
-          - pkg: io/ioutil
-            desc: "replaced by io and os packages since Go 1.16: https://tip.golang.org/doc/go1.16#ioutil"
-          - pkg: errors
-            desc: "Use 'github.com/Lexer747/acci-ping/utils/errors' instead"
-  goheader:
-    values:
-      regexp:
-        # Define here regexp type values.
-        # for example:
-        AUTHOR: .*
-    # The template use for checking.
-    # Default: ""
-    template: |-
-              Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
-
-              Copyright {{ MOD-YEAR-RANGE }} {{ AUTHOR }}
-
-              SPDX-License-Identifier: GPL-2.0-only
-  gosec:
-    excludes:
-      - G306 # Too noisy
-  paralleltest:
-    # This can be a red-herring, there's no way to teach it :(
-    ignore-missing-subtests: true
-
-
+version: "2"
 linters:
-  enable-all: true
+  default: all
   disable:
     - cyclop
     - durationcheck
@@ -63,12 +11,10 @@ linters:
     - exhaustruct
     - forbidigo
     - funlen
-    - gci
     - gochecknoglobals
     - gocritic
     - godot
     - godox
-    - gofumpt
     - ireturn
     - mnd
     - nlreturn
@@ -79,3 +25,65 @@ linters:
     - varnamelen
     - wrapcheck
     - wsl
+  settings:
+    depguard:
+      rules:
+        prevent_unmaintained_packages:
+          list-mode: lax # allow unless explicitly denied
+          files:
+            - $all
+            - '!$test'
+          allow:
+            - $gostd
+          deny:
+            - pkg: golang.org/x/net/context
+              desc: now part of std, import 'context' instead
+            - pkg: io/ioutil
+              desc: 'replaced by io and os packages since Go 1.16: https://tip.golang.org/doc/go1.16#ioutil'
+            - pkg: errors
+              desc: Use 'github.com/Lexer747/acci-ping/utils/errors' instead
+    goheader:
+      values:
+        regexp:
+          AUTHOR: .*
+      template: |-
+        Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
+
+        Copyright {{ MOD-YEAR-RANGE }} {{ AUTHOR }}
+
+        SPDX-License-Identifier: GPL-2.0-only
+    gosec:
+      excludes:
+        - G306 # Too noisy
+    lll:
+      # Max line length, lines longer will be reported.
+      # '\t' is counted as 1 character by default, and can be changed with the tab-width option.
+      # Default: 120.
+      line-length: 140
+      tab-width: 4
+    paralleltest:
+      # This can be a red-herring, there's no way to teach it :(
+      ignore-missing-subtests: true
+    staticcheck:
+      checks: [ "all", "-QF1001"]
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

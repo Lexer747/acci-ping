@@ -10,16 +10,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"maps"
 	"os"
-	"runtime"
-	"runtime/pprof"
 	"slices"
 	"strconv"
 	"time"
 
-	backoff "github.com/Lexer747/acci-ping/backoff"
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/files"
 	"github.com/Lexer747/acci-ping/graph"
@@ -28,7 +24,7 @@ import (
 	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
 	"github.com/Lexer747/acci-ping/gui"
 	"github.com/Lexer747/acci-ping/ping"
-	"github.com/Lexer747/acci-ping/utils/check"
+	"github.com/Lexer747/acci-ping/utils/backoff"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/exit"
 	"github.com/Lexer747/acci-ping/utils/siphon"
@@ -200,10 +196,10 @@ func (app *Application) makeErrorGenerator() {
 }
 
 func (app *Application) addListener(r rune, Action func(rune) error) {
-	if _, found := app.GUI.listeningChars[r]; found {
+	if _, found := app.listeningChars[r]; found {
 		panic(fmt.Sprintf("Adding more than one listener for '%v'", r))
 	}
-	app.GUI.listeningChars[r] = terminal.ConditionalListener{
+	app.listeningChars[r] = terminal.ConditionalListener{
 		Listener: terminal.Listener{
 			Action: Action,
 			Name:   "GUI Listener " + strconv.QuoteRune(r),
@@ -215,15 +211,15 @@ func (app *Application) addListener(r rune, Action func(rune) error) {
 }
 
 func (app *Application) addFallbackListener(Action func(rune) error) {
-	app.GUI.fallbacks = append(app.GUI.fallbacks, terminal.Listener{
+	app.fallbacks = append(app.fallbacks, terminal.Listener{
 		Action: Action,
 		Name:   "GUI Fallback Listener",
 	})
 }
 
 func (app *Application) listeners() []terminal.ConditionalListener {
-	ret := make([]terminal.ConditionalListener, 0, len(app.GUI.listeningChars))
-	return slices.AppendSeq(ret, maps.Values(app.GUI.listeningChars))
+	ret := make([]terminal.ConditionalListener, 0, len(app.listeningChars))
+	return slices.AppendSeq(ret, maps.Values(app.listeningChars))
 }
 
 func duplicateData(f *os.File) (*data.Data, error) {
@@ -231,63 +227,6 @@ func duplicateData(f *os.File) (*data.Data, error) {
 	file, fileErr := io.ReadAll(f)
 	_, readingErr := d.FromCompact(file)
 	return d, errors.Join(fileErr, readingErr)
-}
-
-func startMemProfile(ctx context.Context, memprofile string) func() {
-	if memprofile == "" {
-		return func() {}
-	}
-	f, err := os.Create(memprofile)
-	check.NoErr(err, "could not create memory profile")
-
-	doMemProfile := func() {
-		slog.Debug("Writing memory profile")
-		_, err := f.Seek(0, 0)
-		check.NoErr(err, "could not truncate memory profile")
-		_, err = f.Write([]byte{})
-		check.NoErr(err, "could not truncate memory profile")
-		runtime.GC() // get up-to-date statistics
-		if err := pprof.WriteHeapProfile(f); err != nil {
-			check.NoErr(err, "could not write memory profile")
-		}
-	}
-
-	// start a background worker to collect a memory profile to disk every 30s, this slows down the
-	// application but we don't care when have this flag enabled. For accurate CPU profiling this should
-	// be done separately.
-	go func() {
-		t := time.NewTicker(30 * time.Second)
-		for {
-			select {
-			case <-t.C:
-				doMemProfile()
-			case <-ctx.Done():
-				t.Stop()
-				return
-			}
-		}
-	}()
-	return func() {
-		doMemProfile()
-		f.Close()
-	}
-}
-
-func startCPUProfiling(cpuprofile string) func() {
-	if cpuprofile == "" {
-		return func() {}
-	}
-	f, err := os.Create(cpuprofile)
-	check.NoErr(err, "could not create CPU profile")
-	err = pprof.StartCPUProfile(f)
-	check.NoErr(err, "could not start CPU profile")
-	slog.Debug("Started CPU profile", "path", cpuprofile)
-	return func() {
-		slog.Debug("Writing CPU profile", "path", cpuprofile)
-		pprof.StopCPUProfile()
-		check.NoErr(f.Sync(), "failed to Sync profile")
-		check.NoErr(f.Close(), "failed to close profile")
-	}
 }
 
 // TODO incremental read/writes, get the URL ASAP then start the channel, then incremental continuation.

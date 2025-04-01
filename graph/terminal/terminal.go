@@ -132,7 +132,10 @@ func NewFixedSizeTerminal(s Size) (*Terminal, error) {
 func NewParsedFixedSizeTerminal(size string) (*Terminal, error) {
 	s, ok := ParseSize(size)
 	if !ok {
-		return nil, errors.Errorf("Cannot parse %q as terminal a size, should be in the form \"<H>x<W>\", where H and W are integers.", size)
+		return nil, errors.Errorf(
+			"Cannot parse %q as terminal a size, should be in the form \"<H>x<W>\", where H and W are integers.",
+			size,
+		)
 	}
 	return NewFixedSizeTerminal(s)
 }

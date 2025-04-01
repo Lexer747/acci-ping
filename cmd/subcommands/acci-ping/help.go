@@ -25,20 +25,20 @@ func (app *Application) help(
 ) {
 	helpBuffer := app.drawBuffer.Get(draw.HelpIndex)
 	h := help{showHelp: startShowHelp}
-	app.GUI.paint(h.render(app.term.GetSize(), helpBuffer))
+	app.paint(h.render(app.term.GetSize(), helpBuffer))
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case newSize := <-terminalSizeUpdates:
-			app.GUI.paint(h.render(newSize, helpBuffer))
+			app.paint(h.render(newSize, helpBuffer))
 		case toShow := <-helpChannel:
 			switch toShow {
 			case 'h':
 				h.showHelp = !h.showHelp
 			default:
 			}
-			app.GUI.paint(h.render(app.term.GetSize(), helpBuffer))
+			app.paint(h.render(app.term.GetSize(), helpBuffer))
 		}
 	}
 }

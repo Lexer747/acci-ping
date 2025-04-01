@@ -9,12 +9,10 @@ package acciping
 import (
 	"context"
 	"flag"
-	"io"
-	"log/slog"
-	"os"
 
 	"github.com/Lexer747/acci-ping/graph/terminal"
 	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/exit"
@@ -32,12 +30,14 @@ type Config struct {
 	testErrorListener  *bool
 	url                *string
 
+	*application.BuildInfo
 	*flag.FlagSet
 }
 
-func GetFlags() *Config {
+func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
 	ret := &Config{
+		BuildInfo:          info,
 		cpuprofile:         f.String("cpuprofile", "", "write cpu profile to `file`"),
 		debugStrict:        f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
 		filePath:           f.String("file", "", "the file to write the pings into. (default data not saved)"),
@@ -59,15 +59,15 @@ func GetFlags() *Config {
 
 func RunAcciPing(c *Config) {
 	check.Check(c.Parsed(), "flags not parsed")
-	closeLogFile := initLogging(*c.logFile)
+	closeLogFile := application.InitLogging(*c.logFile, c.BuildInfo)
 	defer closeLogFile()
-	closeCPUProfile := startCPUProfiling(*c.cpuprofile)
+	closeCPUProfile := application.InitCPUProfiling(*c.cpuprofile)
 	defer closeCPUProfile()
 
 	app := Application{}
-	ctx, cancelFunc := context.WithCancelCause(context.Background())
-	closeMemProfile := startMemProfile(ctx, *c.memprofile)
+	closeMemProfile := application.InitMemProfile(*c.memprofile)
 	defer closeMemProfile()
+	ctx, cancelFunc := context.WithCancelCause(context.Background())
 	defer cancelFunc(nil)
 	ch, d := app.Init(ctx, *c)
 	err := app.Run(ctx, cancelFunc, ch, d)
@@ -76,26 +76,4 @@ func RunAcciPing(c *Config) {
 	} else {
 		app.Finish()
 	}
-}
-
-func initLogging(file string) func() {
-	if file != "" {
-		f, err := os.Create(file)
-		check.NoErr(err, "could not create Log file")
-		h := slog.NewTextHandler(f, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		})
-		slog.SetDefault(slog.New(h))
-		slog.Debug("Logging started", "file", file)
-		return func() {
-			slog.Debug("Logging finished, closing", "file", file)
-			check.NoErr(f.Close(), "failed to close log file")
-		}
-	}
-	// If no file is specified we want to stop all logging
-	h := slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-		Level: slog.LevelError,
-	})
-	slog.SetDefault(slog.New(h))
-	return func() {}
 }

@@ -354,9 +354,11 @@ func (s *Stats) Merge(other *Stats) *Stats {
 	// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Weighted_incremental_algorithm
 	// Illuminating question:
 	// https://math.stackexchange.com/questions/2867951/formula-of-combined-variance-of-two-data-sets-yields-wrong-output
+	deltaSquare := (s.Mean - ret.Mean) * (s.Mean - ret.Mean)
+	otherDeltaSquare := (other.Mean - ret.Mean) * (other.Mean - ret.Mean)
 	ret.sumOfSquares = s.sumOfSquares + other.sumOfSquares + // First add the sums of squares to keep the original variance
-		float64(s.GoodCount)*math.Pow(s.Mean-ret.Mean, 2) + // The sum of squares of set [s] is compared to the [ret] mean
-		float64(other.GoodCount)*math.Pow(other.Mean-ret.Mean, 2) // The sum of squares of set [other] is compared to the [ret] mean
+		float64(s.GoodCount)*deltaSquare + // The sum of squares of set [s] is compared to the [ret] mean
+		float64(other.GoodCount)*otherDeltaSquare // The sum of squares of set [other] is compared to the [ret] mean
 	ret.computeVariance()
 	return ret
 }

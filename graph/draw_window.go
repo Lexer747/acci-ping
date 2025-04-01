@@ -12,6 +12,7 @@ import (
 	"log/slog"
 
 	"github.com/Lexer747/acci-ping/graph/data"
+	"github.com/Lexer747/acci-ping/graph/gradient"
 	"github.com/Lexer747/acci-ping/graph/terminal"
 	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
 	"github.com/Lexer747/acci-ping/graph/terminal/typography"
@@ -41,7 +42,7 @@ type coords struct {
 // overall library to look at the [drawWindow.labels] instead this draw data.
 type drawnData struct {
 	pingCount          int
-	gradient           gradient
+	solution           gradient.Solution
 	isDroppedBar       bool
 	isDroppedBarFiller bool
 	isLabel            bool
@@ -98,7 +99,7 @@ func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.Buffe
 		case point.shouldDraw(isDroppedBarFillerType):
 			toWriteDropped.WriteString(ansi.CursorPosition(c.y, c.x) + dropFiller)
 		case point.shouldDraw(gradientType):
-			toWriteGradient.WriteString(ansi.CursorPosition(c.y, c.x) + point.gradient.draw())
+			toWriteGradient.WriteString(ansi.CursorPosition(c.y, c.x) + point.solution.Draw())
 		default:
 			dw.checkf(false, "failed to draw point: %+v", point)
 		}
@@ -165,14 +166,14 @@ func (dw *drawWindow) addPoint(
 	}
 }
 
-func (dw *drawWindow) addGradient(x, y int, g gradient) {
+func (dw *drawWindow) addGradient(x, y int, s gradient.Solution) {
 	c := coords{x, y}
 	if drawData, found := dw.cache[c]; found {
 		if drawData.isLabel || drawData.pingCount > 0 {
 			return
 		}
 	}
-	dw.cache[c] = drawnData{gradient: g}
+	dw.cache[c] = drawnData{solution: s}
 }
 
 func (dw *drawWindow) addDroppedBar(x, height int, filler bool) {
@@ -322,7 +323,7 @@ func (dd drawnData) infer() drawnDataType {
 		return labelType
 	case dd.pingCount > 0:
 		return pingCountType
-	case dd.gradient != 0:
+	case dd.solution != 0:
 		return gradientType
 	case dd.isDroppedBar:
 		return isDroppedBarType

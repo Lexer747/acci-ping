@@ -29,6 +29,7 @@ type Style int
 const (
 	RoundedCorners Style = 1
 	SharpCorners   Style = 2
+	NoBorder       Style = 3
 )
 
 func (s Style) String() string {
@@ -37,6 +38,8 @@ func (s Style) String() string {
 		return "RoundedCorners"
 	case SharpCorners:
 		return "SharpCorners"
+	case NoBorder:
+		return "NoBorder"
 	default:
 		return "Unknown Style: " + strconv.Itoa(int(s))
 	}
@@ -48,8 +51,8 @@ type BoxCfg struct {
 
 func (b Box) Draw(size terminal.Size, buf *bytes.Buffer) {
 	p := b.position(size)
-	bar := strings.Repeat("─", b.boxTextWidth(size))
-	corners := getCorner(b.Style)
+	bar := strings.Repeat(b.Style.getHorizontal(), b.boxTextWidth(size))
+	corners := b.Style.getCorner()
 	buf.WriteString(ansi.CursorPosition(p.startY, p.startX) + corners.TopLeft + bar + corners.TopRight)
 	end := 0
 	for i, t := range b.BoxText {
@@ -57,9 +60,9 @@ func (b Box) Draw(size terminal.Size, buf *bytes.Buffer) {
 		if i >= size.Height {
 			break
 		}
-		buf.WriteString(ansi.CursorPosition(p.startY+i+1, p.startX) + "│")
+		buf.WriteString(ansi.CursorPosition(p.startY+i+1, p.startX) + b.Style.getVertical())
 		t.init(b.boxTextWidth(size)).Draw(size, buf)
-		buf.WriteString("|")
+		buf.WriteString(b.Style.getVertical())
 	}
 	buf.WriteString(ansi.CursorPosition(p.startY+end+2, p.startX) + corners.BottomLeft + bar + corners.BottomRight)
 }
@@ -72,17 +75,22 @@ func (b Box) position(size terminal.Size) boxPosition {
 	p := b.Position
 	ret := boxPosition{}
 	switch {
-	case p.Horizontal == Centre && p.Vertical == Centre:
+	case p.Horizontal == Centre && p.Vertical == Middle:
 		originX := size.Width / 2
 		originY := size.Height / 2
 		ret = boxPosition{
 			startY: originY - b.height(size)/2,
 			startX: originX - b.width(size)/2,
 		}
-	case p.Vertical == Centre && p.Horizontal == Right:
+	case p.Vertical == Middle && p.Horizontal == Right:
 		originY := size.Height / 2
 		ret = boxPosition{
 			startY: originY - b.height(size)/2,
+			startX: size.Width - b.width(size),
+		}
+	case p.Vertical == Top && p.Horizontal == Right:
+		ret = boxPosition{
+			startY: b.height(size),
 			startX: size.Width - b.width(size),
 		}
 	default:
@@ -109,13 +117,15 @@ func (b Box) boxTextWidth(size terminal.Size) int {
 	}
 	ret := 0
 	for _, t := range b.BoxText {
-		ret = max(ret, t.TextLen)
+		ret = max(ret, t.Len())
 	}
 	return ret
 }
 
 func (b Box) widthFromStyle() int {
 	switch b.Style {
+	case NoBorder:
+		return 0
 	case RoundedCorners, SharpCorners:
 		return 2
 	default:
@@ -127,12 +137,36 @@ type corners struct {
 	TopLeft, TopRight, BottomLeft, BottomRight string
 }
 
-func getCorner(s Style) corners {
+func (s Style) getVertical() string {
+	switch s {
+	case RoundedCorners, SharpCorners:
+		return "│"
+	case NoBorder:
+		return ""
+	default:
+		panic("unknown box style: " + s.String())
+	}
+}
+
+func (s Style) getHorizontal() string {
+	switch s {
+	case RoundedCorners, SharpCorners:
+		return "─"
+	case NoBorder:
+		return ""
+	default:
+		panic("unknown box style: " + s.String())
+	}
+}
+
+func (s Style) getCorner() corners {
 	switch s {
 	case RoundedCorners:
 		return corners{TopLeft: "╭", TopRight: "╮", BottomLeft: "╰", BottomRight: "╯"}
 	case SharpCorners:
 		return corners{TopLeft: "┌", TopRight: "┐", BottomLeft: "└", BottomRight: "┘"}
+	case NoBorder:
+		return corners{TopLeft: "", TopRight: "", BottomLeft: "", BottomRight: ""}
 	default:
 		panic("unknown box style: " + s.String())
 	}

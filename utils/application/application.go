@@ -12,6 +12,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 
 	"github.com/Lexer747/acci-ping/utils/check"
 )
@@ -71,16 +72,24 @@ func InitCPUProfiling(cpuprofile string) (toDefer func()) {
 	if cpuprofile == "" {
 		return func() {}
 	}
-	f, err := os.Create(cpuprofile)
+	cpuFile, err := os.Create(cpuprofile)
 	check.NoErr(err, "could not create CPU profile")
-	err = pprof.StartCPUProfile(f)
+	err = pprof.StartCPUProfile(cpuFile)
 	check.NoErr(err, "could not start CPU profile")
-	slog.Debug("Started CPU profile", "path", cpuprofile)
+	traceFile, err := os.Create("trace-" + cpuprofile)
+	check.NoErr(err, "could not create Trace CPU profile")
+	err = trace.Start(traceFile)
+	check.NoErr(err, "could not start Trace CPU profile")
+
+	slog.Debug("Started CPU & Trace profile", "path", cpuprofile)
 	return func() {
 		slog.Debug("Writing CPU profile", "path", cpuprofile)
+		trace.Stop()
 		pprof.StopCPUProfile()
-		check.NoErr(f.Sync(), "failed to Sync profile")
-		check.NoErr(f.Close(), "failed to close profile")
+		check.NoErr(cpuFile.Sync(), "failed to Sync profile")
+		check.NoErr(cpuFile.Close(), "failed to close profile")
+		check.NoErr(traceFile.Sync(), "failed to Sync profile")
+		check.NoErr(traceFile.Close(), "failed to close profile")
 	}
 }
 

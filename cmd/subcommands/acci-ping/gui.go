@@ -18,9 +18,13 @@ type GUI struct {
 	listeningChars map[rune]terminal.ConditionalListener
 	fallbacks      []terminal.Listener
 
-	m        sync.Mutex
-	p, lastP uint64
-	i, lastI uint64
+	m sync.Mutex
+
+	// We track all of these arbitrary id's so that we can hand them out to the callee of this GUI. We choose
+	// a monotonic implementation so that we can easily determine which token we should expect back.
+
+	paintIdx, drawnPaintIdx           uint64
+	invalidateIdx, drawnInvalidateIdx uint64
 }
 
 var _ gui.GUI = (&GUI{})
@@ -58,39 +62,50 @@ func (g *GUI) paint(update paintUpdate) {
 	}
 	g.m.Lock()
 	defer g.m.Unlock()
+	// If we have painted then increment
 	if (update & Paint) != None {
-		g.p++
+		g.paintIdx++
 	}
+	// If we have invalidate then increment
 	if (update & Invalidate) != None {
-		g.i++
+		g.invalidateIdx++
 	}
 }
 
+// Drawn implements [gui.GUI]. In this case our GUI will be informed by the callee which token was actually
+// consumed and so we can use this in future to determine if we need to draw/invalidate still.
 func (g *GUI) Drawn(t gui.Token) {
 	token, ok := t.(*paintToken)
 	check.Check(ok, "should only be called with original gui token")
-	g.lastI = token.i
-	g.lastP = token.p
+	g.drawnInvalidateIdx = token.invalidateIdx
+	g.drawnPaintIdx = token.paintIdx
 }
 
-// GetState implements gui.GUI.
+// GetState implements [gui.GUI].
 func (g *GUI) GetState() gui.Token {
 	g.m.Lock()
 	defer g.m.Unlock()
-	return &paintToken{p: g.p, lastP: g.lastP, i: g.i, lastI: g.lastI}
+	return &paintToken{
+		paintIdx:            g.paintIdx,
+		drawnPaintIdx:       g.drawnPaintIdx,
+		invalidateIdx:       g.invalidateIdx,
+		drawnInvalidatedIdx: g.drawnInvalidateIdx,
+	}
 }
 
+// paintToken can easily determine if we need to draw or invalidate because we know indexes are monotonic if
+// current index is larger than the last seen index from [Drawn] then we know we need to do that action.
 type paintToken struct {
-	p, lastP uint64
-	i, lastI uint64
+	paintIdx, drawnPaintIdx            uint64
+	invalidateIdx, drawnInvalidatedIdx uint64
 }
 
 func (p *paintToken) ShouldDraw() bool {
-	return p.p > p.lastP
+	return p.paintIdx > p.drawnPaintIdx
 }
 
 func (p *paintToken) ShouldInvalidate() bool {
-	return p.i > p.lastI
+	return p.invalidateIdx > p.drawnInvalidatedIdx
 }
 
 var _ gui.Token = (&paintToken{})

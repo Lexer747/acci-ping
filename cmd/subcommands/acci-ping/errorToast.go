@@ -21,7 +21,7 @@ import (
 )
 
 // toastNotifications which should only be called once the paint buffer is initialised.
-func (app *Application) toastNotifications(ctx context.Context, terminalSizeUpdates chan terminal.Size) {
+func (app *Application) toastNotifications(ctx context.Context, terminalSizeUpdates <-chan terminal.Size) {
 	store := toastStore{
 		Mutex:  &sync.Mutex{},
 		toasts: map[int]toast{},
@@ -129,7 +129,7 @@ func makeBox(ts []toast) gui.Box {
 	return gui.Box{
 		BoxText: text,
 		Position: gui.Position{
-			Vertical:   gui.Centre,
+			Vertical:   gui.Middle,
 			Horizontal: gui.Centre,
 			Padding:    gui.NoPadding,
 		},

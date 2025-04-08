@@ -13,11 +13,25 @@ import (
 	"github.com/Lexer747/acci-ping/graph/terminal"
 )
 
+// GUI is the abstract notion of all the components which make up the GUI, providing two methods, the "state"
+// of the GUI informs a callee about whether this GUI would like to be drawn [Token.ShouldDraw]. And a further
+// clarifying [Token.ShouldInvalidate] which tells the callee that the underlying GUI believes the components
+// have changed and thus need clearing from the output, with nothing to be drawn.
+//
+// See the concrete implementation used by acci-ping at [cmd/subcommands/acci-ping/gui.go]
 type GUI interface {
 	GetState() Token
 	Drawn(t Token)
 }
 
+// Token represents the state of the GUI and can be queried about what it desires. If [ShouldDraw] returns
+// true the GUI would like to be drawn. [ShouldInvalidate] however returns true if the component should be
+// removed from the canvas.
+//
+// If both return false the GUI has no work to be done and last known frame is correct.
+//
+// Once the callee has rendered the GUI it should return this token back to the [GUI] with [GUI.Drawn] so that
+// the GUI can keep track of what frame was drawn.
 type Token interface {
 	ShouldDraw() bool
 	ShouldInvalidate() bool
@@ -30,14 +44,16 @@ type Draw interface {
 }
 
 var _ Draw = (&Box{})
-var _ Draw = (&iTypography{})
+var _ Draw = (&initialisedTypography{})
 
+// A Position contains all the GUI data required to know where a GUI component should be drawn.
 type Position struct {
-	Vertical   Alignment
-	Horizontal Alignment
+	Vertical   VerticalAlignment
+	Horizontal HorizontalAlignment
 	Padding    Padding
 }
 
+// Padding represents in pixels how many pixels should be offset in the given direction.
 type Padding struct {
 	Top, Bottom, Left, Right int
 }
@@ -51,15 +67,20 @@ func (p Padding) Equal(other Padding) bool {
 
 var NoPadding Padding = Padding{}
 
-type Alignment int
+type HorizontalAlignment int
+type VerticalAlignment int
 
 const (
-	Left   Alignment = 1
-	Centre Alignment = 2
-	Right  Alignment = 3
+	Left   HorizontalAlignment = 1
+	Centre HorizontalAlignment = 2
+	Right  HorizontalAlignment = 3
+
+	Top    VerticalAlignment = 1
+	Middle VerticalAlignment = 2
+	Bottom VerticalAlignment = 3
 )
 
-func (a Alignment) String() string {
+func (a HorizontalAlignment) String() string {
 	switch a {
 	case Left:
 		return "Left"
@@ -67,6 +88,19 @@ func (a Alignment) String() string {
 		return "Centre"
 	case Right:
 		return "Right"
+	default:
+		return "Unknown Alignment: " + strconv.Itoa(int(a))
+	}
+}
+
+func (a VerticalAlignment) String() string {
+	switch a {
+	case Top:
+		return "Top"
+	case Middle:
+		return "Middle"
+	case Bottom:
+		return "Bottom"
 	default:
 		return "Unknown Alignment: " + strconv.Itoa(int(a))
 	}

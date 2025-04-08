@@ -234,21 +234,33 @@ func (s Spans) Count() int {
 }
 
 type Iter struct {
-	Total int64
-	d     *data.Data
-	spans Spans
+	Total  int64
+	d      *data.Data
+	spans  Spans
+	offset int64
 }
 
-func (gd *GraphData) LockFreeIter() *Iter {
+func (gd *GraphData) LockFreeIter(followLatestSpan bool) *Iter {
+	offset := int64(0)
+	total := gd.LockFreeTotalCount()
+	if followLatestSpan {
+		spans := gd.LockFreeSpanInfos()
+		lastIndex := len(spans) - 1
+		spansExceptLast := spans[:lastIndex]
+		offset = int64(spansExceptLast.Count())
+		lastSpan := spans[lastIndex]
+		total = int64(lastSpan.Count)
+	}
 	return &Iter{
-		Total: gd.LockFreeTotalCount(),
-		d:     gd.data,
-		spans: gd.LockFreeSpanInfos(),
+		Total:  total,
+		d:      gd.data,
+		spans:  gd.LockFreeSpanInfos(),
+		offset: offset,
 	}
 }
 
 func (i *Iter) Get(index int64) ping.PingDataPoint {
-	return i.d.Get(index)
+	return i.d.Get(index + i.offset)
 }
 
 func (i *Iter) IsLast(index int64) bool {

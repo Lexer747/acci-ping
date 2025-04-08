@@ -21,7 +21,6 @@ import (
 	"github.com/Lexer747/acci-ping/graph/terminal"
 	termTh "github.com/Lexer747/acci-ping/graph/terminal/th"
 	graphTh "github.com/Lexer747/acci-ping/graph/th"
-	"github.com/Lexer747/acci-ping/gui"
 	"github.com/Lexer747/acci-ping/ping"
 	"github.com/Lexer747/acci-ping/utils/env"
 	"gotest.tools/v3/assert"
@@ -188,7 +187,13 @@ func produceFrame(t *testing.T, size terminal.Size, data *data.Data, terminalWra
 	assert.NilError(t, err)
 	pingChannel := make(chan ping.PingResults)
 	close(pingChannel)
-	g := graph.NewGraphWithData(ctx, pingChannel, term, gui.NoGUI(), 0, data, draw.NewPaintBuffer(), true)
+	g := graph.NewGraph(ctx, graph.GraphConfiguration{
+		Input:         pingChannel,
+		Terminal:      term,
+		DrawingBuffer: draw.NewPaintBuffer(),
+		DebugStrict:   true,
+		Data:          data,
+	})
 	defer func() { stdin.WriteCtrlC(t) }()
 	output := makeBuffer(size)
 	return playAnsiOntoStringBuffer(g.ComputeFrame(), output, size, terminalWrapping)

@@ -173,7 +173,7 @@ func (test BasicTimeSpanTest) Run(t *testing.T) {
 
 func assertEveryPointHasSpan(t *testing.T, gd *graphdata.GraphData, actual []*graphdata.SpanInfo) {
 	t.Helper()
-	iter := gd.LockFreeIter()
+	iter := gd.LockFreeIter(false)
 	for i := range iter.Total {
 		p := iter.Get(i)
 		timestamp := p.Timestamp

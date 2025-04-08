@@ -42,16 +42,17 @@ type Application struct {
 	drawBuffer *draw.Buffer
 
 	errorChannel chan error
+	controlPlane chan graph.Control
 }
 
 func (app *Application) Run(
 	ctx context.Context,
 	cancelFunc context.CancelCauseFunc,
-	channel chan ping.PingResults,
+	channel <-chan ping.PingResults,
 	existingData *data.Data,
 ) error {
 	var fileData *data.Data
-	var graphChannel, fileChannel chan ping.PingResults
+	var graphChannel, fileChannel <-chan ping.PingResults
 	if app.toUpdate != nil {
 		// The ping channel which is already running needs to be duplicated, providing one to the Graph and second
 		// to a file writer. This de-couples the processes, we don't want the GUI to affect storing data and vice
@@ -68,27 +69,40 @@ func (app *Application) Run(
 	app.drawBuffer = draw.NewPaintBuffer()
 
 	helpCh := make(chan rune)
+	controlCh := make(chan graph.Control)
 	app.addFallbackListener(helpAction(helpCh))
 
 	// The graph will take ownership of the data channel and data pointer.
-	app.g = graph.NewGraphWithData(
+	app.g = graph.NewGraph(
 		ctx,
-		graphChannel,
-		app.term,
-		app.GUI,
-		*app.config.pingsPerMinute,
-		existingData,
-		app.drawBuffer,
-		*app.config.debugStrict,
+		graph.GraphConfiguration{
+			Input:          graphChannel,
+			Terminal:       app.term,
+			Gui:            app.GUI,
+			PingsPerMinute: *app.config.pingsPerMinute,
+			DrawingBuffer:  app.drawBuffer,
+			InitialControl: graph.Control{}, // TODO make it a command line setting
+			ControlPlane:   app.controlPlane,
+			DebugStrict:    *app.config.debugStrict,
+			Data:           existingData,
+		},
 	)
 	_ = app.g.Term.ClearScreen(terminal.UpdateSizeAndMoveHome)
 
 	if *app.config.testErrorListener {
 		app.makeErrorGenerator()
 	}
+	app.addListener('f', func(rune) error {
+		update := graph.Control{FollowLatestSpan: true}
+		app.controlPlane <- update
+		controlCh <- update
+		return nil
+	})
 
 	defer close(app.errorChannel)
+	defer close(app.controlPlane)
 	defer close(helpCh)
+	defer close(controlCh)
 	// Very high FPS is good for responsiveness in the UI (since it's locked) and re-drawing on a re-size.
 	// TODO add UI listeners, zooming, changing ping speed - etc
 	graph, cleanup, terminalSizeUpdates, err := app.g.Run(ctx, cancelFunc, 120, app.listeners(), app.fallbacks)
@@ -117,14 +131,19 @@ func (app *Application) Run(
 		defer termRecover()
 		app.help(ctx, !*app.config.hideHelpOnStart, helpCh, terminalSizeUpdates)
 	}()
+	go func() {
+		defer termRecover()
+		app.showControls(ctx, controlCh, terminalSizeUpdates)
+	}()
 	defer termRecover()
 	exit.OnError(err)
 	return graph()
 }
 
-func (app *Application) Init(ctx context.Context, c Config) (channel chan ping.PingResults, existingData *data.Data) {
+func (app *Application) Init(ctx context.Context, c Config) (channel <-chan ping.PingResults, existingData *data.Data) {
 	app.config = c
 	app.errorChannel = make(chan error)
+	app.controlPlane = make(chan graph.Control)
 	app.GUI = newGUIState()
 	p := ping.NewPing()
 	var err error
@@ -156,7 +175,7 @@ func (app *Application) Finish() {
 	}
 }
 
-func (app *Application) writeToFile(ctx context.Context, ourData *data.Data, input chan ping.PingResults) {
+func (app *Application) writeToFile(ctx context.Context, ourData *data.Data, input <-chan ping.PingResults) {
 	defer app.toUpdate.Close()
 	backoff := backoff.NewExponentialBackoff(500 * time.Millisecond)
 	for {

@@ -12,10 +12,12 @@ import (
 	"math"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/errors"
+	"github.com/Lexer747/acci-ping/utils/sliceutils"
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -172,7 +174,7 @@ func (p PingDataPoint) Equal(other PingDataPoint) bool {
 	return p.Duration == other.Duration && p.Timestamp.Equal(other.Timestamp) && p.DropReason == other.DropReason
 }
 
-func (p *Ping) CreateChannel(ctx context.Context, url string, pingsPerMinute float64, channelSize int) (chan PingResults, error) {
+func (p *Ping) CreateChannel(ctx context.Context, url string, pingsPerMinute float64, channelSize int) (<-chan PingResults, error) {
 	if pingsPerMinute < 0 {
 		return nil, errors.Errorf("Invalid pings per minute %f, should be larger than 0", pingsPerMinute)
 	}
@@ -194,7 +196,7 @@ func (p *Ping) CreateChannel(ctx context.Context, url string, pingsPerMinute flo
 	return client, nil
 }
 
-func (p *Ping) startChannel(ctx context.Context, client chan PingResults, closer func(), url string, rateLimit *time.Ticker) {
+func (p *Ping) startChannel(ctx context.Context, client chan<- PingResults, closer func(), url string, rateLimit *time.Ticker) {
 	run := func() {
 		defer close(client)
 		defer closer()
@@ -230,7 +232,13 @@ func (p *Ping) startChannel(ctx context.Context, client chan PingResults, closer
 	go run()
 }
 
-func (p *Ping) dnsRetry(url string, client chan PingResults, timestamp time.Time, rateLimit *time.Ticker, closer func()) (net.IP, func()) {
+func (p *Ping) dnsRetry(
+	url string,
+	client chan<- PingResults,
+	timestamp time.Time,
+	rateLimit *time.Ticker,
+	closer func(),
+) (net.IP, func()) {
 	var err error
 	var newCloser func()
 HARD_RETRY:
@@ -320,7 +328,7 @@ func (p *Ping) pingOnChannel(
 	timestamp time.Time,
 	selectedIP net.IP,
 	seq uint16,
-	client chan PingResults,
+	client chan<- PingResults,
 	buffer []byte,
 ) (uint16, bool) {
 	// Can gain some speed here by not remaking this each time, only to change the sequence number.
@@ -419,7 +427,7 @@ func (p *Ping) writeEcho(selectedIP net.IP, raw []byte) error {
 
 func (p *Ping) startListening(url string) (closer func(), err error) {
 	// TODO supporting windows (privileges etc)
-	p.connect, err = icmp.ListenPacket("udp4", listenAddr.String())
+	p.connect, err = p.evalListeningOptions()
 	p.currentURL = url
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't listen")
@@ -453,8 +461,6 @@ func isIpv4(ip net.IP) bool {
 	return false
 }
 
-var listenAddr = net.IPv4zero
-
 func (dct DNSCacheTrust) String() string {
 	switch dct {
 	case LowTrust:
@@ -465,4 +471,38 @@ func (dct DNSCacheTrust) String() string {
 		return "High Trust"
 	}
 	panic("exhaustive:enforce")
+}
+
+func (p *Ping) evalListeningOptions() (*icmp.PacketConn, error) {
+	errs := []error{}
+	for _, listenCfg := range listenList {
+		conn, err := icmp.ListenPacket(listenCfg.network, listenCfg.address)
+		if conn != nil && err == nil {
+			return conn, nil
+		}
+	}
+	strs := sliceutils.Map(errs, func(e error) string {
+		return e.Error() + "\n"
+	})
+	return nil, errors.New("couldn't listen for ping packets:\n" + strings.Join(strs, "- "))
+}
+
+var ipv4ListenAddr = net.IPv4zero
+var ipv6ListenAddr = net.IPv6zero
+
+var listenList = []listenerConfig{
+	{network: "udp4", address: ipv4ListenAddr.String()},
+	{network: "udp6", address: ipv6ListenAddr.String()},
+	{network: "ip4:1", address: ipv4ListenAddr.String()},
+	{network: "ip6:ipv6-icmp", address: ipv6ListenAddr.String()},
+
+	// TODO add and support:
+	//	- ip4:icmp
+	//	- ip6:58
+	//	- udp4 + custom addr
+	//	- udp6 + custom addr
+}
+
+type listenerConfig struct {
+	network, address string
 }

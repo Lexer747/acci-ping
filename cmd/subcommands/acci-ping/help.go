@@ -20,8 +20,8 @@ import (
 func (app *Application) help(
 	ctx context.Context,
 	startShowHelp bool,
-	helpChannel chan rune,
-	terminalSizeUpdates chan terminal.Size,
+	helpChannel <-chan rune,
+	terminalSizeUpdates <-chan terminal.Size,
 ) {
 	helpBuffer := app.drawBuffer.Get(draw.HelpIndex)
 	h := help{showHelp: startShowHelp}
@@ -62,7 +62,7 @@ func (h help) render(size terminal.Size, buf *bytes.Buffer) paintUpdate {
 	return ret
 }
 
-func helpAction(ch chan rune) func(r rune) error {
+func helpAction(ch chan<- rune) func(r rune) error {
 	return func(r rune) error {
 		ch <- r
 		return nil
@@ -73,7 +73,7 @@ func (h help) makeHelpBox() gui.Box {
 	return gui.Box{
 		BoxText: helpCopy,
 		Position: gui.Position{
-			Vertical:   gui.Centre,
+			Vertical:   gui.Middle,
 			Horizontal: gui.Right,
 			Padding:    gui.Padding{Left: 4},
 		},
@@ -85,5 +85,6 @@ var helpCopy = []gui.Typography{
 	{ToPrint: ansi.Yellow("Help"), TextLen: 4, Alignment: gui.Centre},
 	{ToPrint: "", TextLen: 0, Alignment: gui.Centre},
 	{ToPrint: "Press " + ansi.Green("ctrl+c") + " to exit.", TextLen: 6 + 6 + 9, Alignment: gui.Left},
+	{ToPrint: "Press " + ansi.Green("f") + " to follow the most recent data.", TextLen: 6 + 1 + 32, Alignment: gui.Left},
 	{ToPrint: "Press " + ansi.Green("h") + " to open/close this window.", TextLen: 6 + 1 + 27, Alignment: gui.Left},
 }

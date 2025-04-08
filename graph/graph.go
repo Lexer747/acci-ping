@@ -26,12 +26,13 @@ import (
 
 type Graph struct {
 	Term *terminal.Terminal
-	ui   gui.GUI
+
+	ui gui.GUI
 
 	debugStrict bool
 
 	sinkAlive   bool
-	dataChannel chan ping.PingResults
+	dataChannel <-chan ping.PingResults
 
 	pingsPerMinute float64
 
@@ -41,42 +42,61 @@ type Graph struct {
 	lastFrame  frame
 
 	drawingBuffer *draw.Buffer
+
+	currentControl *controlState
+	controlPlane   <-chan Control
 }
 
-func NewGraph(
-	ctx context.Context,
-	input chan ping.PingResults,
-	t *terminal.Terminal,
-	gui gui.GUI,
-	pingsPerMinute float64,
-	URL string,
-	drawingBuffer *draw.Buffer,
-	debugStrict bool,
-) *Graph {
-	return NewGraphWithData(ctx, input, t, gui, pingsPerMinute, data.NewData(URL), drawingBuffer, debugStrict)
+type Control struct {
+	FollowLatestSpan bool
 }
 
-func NewGraphWithData(
-	ctx context.Context,
-	input chan ping.PingResults,
-	t *terminal.Terminal,
-	gui gui.GUI,
-	pingsPerMinute float64,
-	data *data.Data,
-	drawingBuffer *draw.Buffer,
-	debugStrict bool,
-) *Graph {
+type controlState struct {
+	Control
+	m *sync.Mutex
+}
+
+type GraphConfiguration struct {
+	// Input will be owned by the graph and represents the source of data for the graph to plot.
+	Input <-chan ping.PingResults
+	// Terminal is the underlying terminal the graph will draw to and perform all external I/O too. The graph
+	// takes ownership of the terminal.
+	Terminal *terminal.Terminal
+	// Gui is the external GUI interface which the terminal will call [gui.Draw] on each frame if the gui
+	// component requires it. This
+	Gui            gui.GUI
+	PingsPerMinute float64
+	URL            string
+	DrawingBuffer  *draw.Buffer
+	InitialControl Control
+	ControlPlane   <-chan Control
+	DebugStrict    bool
+
+	// Optionals:
+
+	Data *data.Data
+}
+
+func NewGraph(ctx context.Context, cfg GraphConfiguration) *Graph {
+	if cfg.Data == nil {
+		cfg.Data = data.NewData(cfg.URL)
+	}
+	if cfg.Gui == nil {
+		cfg.Gui = gui.NoGUI()
+	}
 	g := &Graph{
-		Term:           t,
+		Term:           cfg.Terminal,
 		sinkAlive:      true,
-		dataChannel:    input,
-		pingsPerMinute: pingsPerMinute,
-		data:           graphdata.NewGraphData(data),
+		dataChannel:    cfg.Input,
+		pingsPerMinute: cfg.PingsPerMinute,
+		data:           graphdata.NewGraphData(cfg.Data),
 		frameMutex:     &sync.Mutex{},
 		lastFrame:      frame{},
-		drawingBuffer:  drawingBuffer,
-		ui:             gui,
-		debugStrict:    debugStrict,
+		drawingBuffer:  cfg.DrawingBuffer,
+		ui:             cfg.Gui,
+		debugStrict:    cfg.DebugStrict,
+		controlPlane:   cfg.ControlPlane,
+		currentControl: &controlState{Control: cfg.InitialControl, m: &sync.Mutex{}},
 	}
 	if ctx != nil {
 		// A nil context is valid: It means that no new data is expected and the input channel isn't active
@@ -103,7 +123,7 @@ func (g *Graph) Run(
 	fps int,
 	listeners []terminal.ConditionalListener,
 	fallbacks []terminal.Listener,
-) (func() error, func(), chan terminal.Size, error) {
+) (func() error, func(), <-chan terminal.Size, error) {
 	timeBetweenFrames := getTimeBetweenFrames(fps, g.pingsPerMinute)
 	frameRate := time.NewTicker(timeBetweenFrames)
 	cleanup, err := g.Term.StartRaw(ctx, stop, listeners, fallbacks)
@@ -127,13 +147,18 @@ func (g *Graph) Run(
 					terminalUpdates <- size
 					size = g.Term.GetSize()
 				}
-				toWrite := g.computeFrame(timeBetweenFrames, true)
+				g.currentControl.m.Lock()
+				toWrite := g.computeFrame(timeBetweenFrames, g.currentControl.FollowLatestSpan, true)
+				g.currentControl.m.Unlock()
 				err = toWrite(g.Term)
 				if err != nil {
 					return err
 				}
 			}
 		}
+	}
+	if g.controlPlane != nil {
+		go g.handleControl(ctx)
 	}
 	return graph, cleanup, terminalUpdates, err
 }
@@ -146,7 +171,7 @@ func (g *Graph) OneFrame() error {
 	if err := g.Term.UpdateSize(); err != nil {
 		return err
 	}
-	toWrite := g.computeFrame(0, false)
+	toWrite := g.computeFrame(0, g.currentControl.FollowLatestSpan, false)
 	return toWrite(g.Term)
 }
 
@@ -185,6 +210,27 @@ func (g *Graph) sink(ctx context.Context) {
 	}
 }
 
+func (g *Graph) handleControl(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case p, ok := <-g.controlPlane:
+			if !ok {
+				return
+			}
+			// Note we don't need the mutex while reading the values.
+			if p.FollowLatestSpan {
+				// But we do need it while writing
+				g.currentControl.m.Lock()
+				g.currentControl.FollowLatestSpan = !g.currentControl.FollowLatestSpan
+				g.currentControl.m.Unlock()
+			}
+			slog.Debug("switching to:", "FollowLatestSpan", g.currentControl.FollowLatestSpan)
+		}
+	}
+}
+
 func (g *Graph) checkf(shouldBeTrue bool, format string, a ...any) {
 	if g.debugStrict {
 		check.Checkf(shouldBeTrue, format, a...)
@@ -200,10 +246,12 @@ type frame struct {
 	framePainter      func(io.Writer) error
 	framePainterNoGui func(io.Writer) error
 	spinnerIndex      int
+	followLatestSpan  bool
 }
 
-func (f frame) Match(s terminal.Size) bool {
-	return f.xAxis.size == s.Width && f.yAxis.size == s.Height
+func (f frame) Match(s terminal.Size, followLatestSpan bool) bool {
+	return f.xAxis.size == s.Width && f.yAxis.size == s.Height &&
+		f.followLatestSpan == followLatestSpan
 }
 
 func (f frame) Size() terminal.Size {

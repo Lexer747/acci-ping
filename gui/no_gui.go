@@ -11,6 +11,7 @@ var _ GUI = (&noGUI{})
 type noGUI struct {
 }
 
+// NoGUI is a gui implementation which never does any work or asks for any work to be done. Useful for tests.
 func NoGUI() GUI {
 	return noGUI{}
 }

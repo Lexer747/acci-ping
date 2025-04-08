@@ -47,6 +47,7 @@ var (
 	DataIndex     = newIndex()
 	GradientIndex = newIndex()
 	HelpIndex     = newIndex()
+	ControlIndex  = newIndex()
 	KeyIndex      = newIndex()
 	SpinnerIndex  = newIndex()
 	ToastIndex    = newIndex()
@@ -70,6 +71,7 @@ var PaintOrder = []Index{
 	KeyIndex,
 	// Notifications can appear above the graph as they're ephemeral
 	ToastIndex,
+	ControlIndex,
 	HelpIndex,
 	// if we can't see the spinner we may be worried the program is dead
 	SpinnerIndex,
@@ -77,9 +79,10 @@ var PaintOrder = []Index{
 
 // GraphIndexes is the [PaintOrder] with the GUI indexes removed
 var GraphIndexes = sliceutils.Remove(PaintOrder,
-	ToastIndex,
+	ControlIndex,
 	HelpIndex,
 	SpinnerIndex,
+	ToastIndex,
 )
 
 // GUIIndexes is the above paint order with the GraphIndexes indexes removed

@@ -368,8 +368,8 @@ func (t *Terminal) processListenedRune(r rune) {
 
 func (t *Terminal) listen(
 	ctx context.Context,
-	listenChannel chan listenResult,
-	processingChannel chan struct{},
+	listenChannel chan<- listenResult,
+	processingChannel <-chan struct{},
 	buffer []byte,
 ) {
 	defer close(listenChannel)

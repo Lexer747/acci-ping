@@ -46,11 +46,10 @@ type controlState struct {
 
 func (c controlState) render(size terminal.Size, buf *bytes.Buffer) paintUpdate {
 	ret := None
-	shouldInvalidate := buf.Len() != 0
-	if shouldInvalidate {
+	buf.Reset()
+	if !c.following {
 		ret = ret | Invalidate
 	}
-	buf.Reset()
 	if c.following {
 		box := c.makeControlBox()
 		box.Draw(size, buf)
@@ -69,7 +68,7 @@ func (c controlState) makeControlBox() gui.Box {
 		Position: gui.Position{
 			Vertical:   gui.Top,
 			Horizontal: gui.Right,
-			Padding:    gui.Padding{Left: 4, Bottom: 0},
+			Padding:    gui.Padding{Bottom: 1},
 		},
 		Style: gui.NoBorder,
 	}

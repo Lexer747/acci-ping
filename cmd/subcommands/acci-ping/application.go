@@ -25,9 +25,9 @@ import (
 	"github.com/Lexer747/acci-ping/gui"
 	"github.com/Lexer747/acci-ping/ping"
 	"github.com/Lexer747/acci-ping/utils/backoff"
+	"github.com/Lexer747/acci-ping/utils/channels"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/exit"
-	"github.com/Lexer747/acci-ping/utils/siphon"
 )
 
 type Application struct {
@@ -57,7 +57,7 @@ func (app *Application) Run(
 		// The ping channel which is already running needs to be duplicated, providing one to the Graph and second
 		// to a file writer. This de-couples the processes, we don't want the GUI to affect storing data and vice
 		// versa.
-		graphChannel, fileChannel = siphon.TeeBufferedChannel(ctx, channel, *app.config.pingBufferingLimit)
+		graphChannel, fileChannel = channels.TeeBufferedChannel(ctx, channel, *app.config.pingBufferingLimit)
 		var err error
 		fileData, err = duplicateData(app.toUpdate)
 		exit.OnError(err)
@@ -113,6 +113,8 @@ func (app *Application) Run(
 			panic(err)
 		}
 	}
+	terminalUpdates := channels.FanInFanOut(ctx, terminalSizeUpdates, 0, 3)
+
 	// https://go.dev/ref/spec#Handling_panics
 	// https://go.dev/blog/defer-panic-and-recover
 	//
@@ -125,15 +127,15 @@ func (app *Application) Run(
 	}
 	go func() {
 		defer termRecover()
-		app.toastNotifications(ctx, terminalSizeUpdates)
+		app.toastNotifications(ctx, terminalUpdates[0])
 	}()
 	go func() {
 		defer termRecover()
-		app.help(ctx, !*app.config.hideHelpOnStart, helpCh, terminalSizeUpdates)
+		app.help(ctx, !*app.config.hideHelpOnStart, helpCh, terminalUpdates[1])
 	}()
 	go func() {
 		defer termRecover()
-		app.showControls(ctx, controlCh, terminalSizeUpdates)
+		app.showControls(ctx, controlCh, terminalUpdates[2])
 	}()
 	defer termRecover()
 	exit.OnError(err)

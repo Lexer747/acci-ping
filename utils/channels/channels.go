@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
-package siphon
+package channels
 
 import (
 	"context"
@@ -35,4 +35,36 @@ func TeeBufferedChannel[T any](ctx context.Context, c <-chan T, channelSize int)
 		}
 	}()
 	return left, right
+}
+
+func FanInFanOut[T any](ctx context.Context, c <-chan T, channelSize, fanOutCount int) (
+	Out []<-chan T,
+) {
+	outChans := make([]chan T, fanOutCount)
+	for i := range fanOutCount {
+		outChans[i] = make(chan T, channelSize)
+	}
+	go func() {
+		defer func() {
+			for i := range fanOutCount {
+				close(outChans[i])
+			}
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+			case v := <-c:
+				for i := range fanOutCount {
+					go func() {
+						outChans[i] <- v
+					}()
+				}
+			}
+		}
+	}()
+	result := make([]<-chan T, fanOutCount)
+	for i := range fanOutCount {
+		result[i] = outChans[i]
+	}
+	return result
 }

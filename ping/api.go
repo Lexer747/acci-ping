@@ -25,6 +25,7 @@ import (
 
 type Ping struct {
 	connect    *icmp.PacketConn
+	addrType   addressType
 	id         uint16
 	currentURL string
 	timeout    time.Duration
@@ -57,13 +58,8 @@ func NewPing() *Ping {
 }
 
 func (p *Ping) OneShot(url string) (time.Duration, error) {
-	// first get the ip for a given url
-	cache, err := IPv4DNSQuery(url, p.dnsCacheTrust)
-	if err != nil {
-		return 0, err
-	}
-	// Don't handle this [!ok] case in OneShot
-	selectedIP, _ := cache.Get()
+	// first we need to start listening this determines the underlying socket type we use and therefore
+	// determine which DNS queries are valid so we need to do this first.
 
 	// Create a listener for the IP we will use
 	closer, err := p.startListening(url)
@@ -71,6 +67,14 @@ func (p *Ping) OneShot(url string) (time.Duration, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	// Now find the IP address we will actually ping to
+	cache, err := DNSQuery(url, p.addrType, p.dnsCacheTrust)
+	if err != nil {
+		return 0, err
+	}
+	// Don't handle this [!ok] case in OneShot
+	selectedIP, _ := cache.Get()
 
 	raw, err := p.makeOutgoingPacket(1)
 	if err != nil {
@@ -128,9 +132,12 @@ const (
 )
 
 func (p PingResults) String() string {
-	if p.IP == nil && p.InternalErr != nil {
-		return "Internal Error " + timestampString(p.Data) + " reason " + p.InternalErr.Error()
-	} else {
+	switch {
+	case p.IP == nil && p.InternalErr == nil:
+		return "DNS Failure (unknown) could not get IP"
+	case p.InternalErr != nil:
+		return "Internal API Error " + timestampString(p.Data) + " reason " + p.InternalErr.Error()
+	default:
 		return p.IP.String() + " | " + p.Data.String()
 	}
 }
@@ -187,7 +194,7 @@ func (p *Ping) CreateChannel(ctx context.Context, url string, pingsPerMinute flo
 
 	// Block the main thread to init this for the first time (most consumers will want to have a [GetLastIP]
 	// value as soon as this method returns), if we get an error let the main loop do the retying.
-	p.addresses, _ = IPv4DNSQuery(url, p.dnsCacheTrust)
+	p.addresses, _ = DNSQuery(url, p.addrType, p.dnsCacheTrust)
 
 	rateLimit := p.buildRateLimiting(pingsPerMinute)
 
@@ -238,7 +245,7 @@ func (p *Ping) dnsRetry(
 	timestamp time.Time,
 	rateLimit *time.Ticker,
 	closer func(),
-) (net.IP, func()) {
+) (*addr, func()) {
 	var err error
 	var newCloser func()
 HARD_RETRY:
@@ -246,7 +253,7 @@ HARD_RETRY:
 		// Keeping doing a DNS query until we get a valid result, count each failure as a dropped packet
 		for p.addresses == nil {
 			// start again, do a new DNS query
-			p.addresses, err = IPv4DNSQuery(url, p.dnsCacheTrust)
+			p.addresses, err = DNSQuery(url, p.addrType, p.dnsCacheTrust)
 			if err != nil {
 				client <- packetLoss(nil, timestamp, DNSFailure)
 				<-rateLimit.C
@@ -326,7 +333,7 @@ func goodPacket(IP net.IP, Duration time.Duration, Timestamp time.Time) PingResu
 func (p *Ping) pingOnChannel(
 	ctx context.Context,
 	timestamp time.Time,
-	selectedIP net.IP,
+	selected *addr,
 	seq uint16,
 	client chan<- PingResults,
 	buffer []byte,
@@ -334,13 +341,13 @@ func (p *Ping) pingOnChannel(
 	// Can gain some speed here by not remaking this each time, only to change the sequence number.
 	raw, err := p.makeOutgoingPacket(seq)
 	if err != nil {
-		client <- internalErr(selectedIP, timestamp, err)
+		client <- internalErr(selected.ip, timestamp, err)
 		return seq, true
 	}
 
 	// Actually write the echo request onto the connection:
-	if err = p.writeEcho(selectedIP, raw); err != nil {
-		client <- internalErr(selectedIP, timestamp, err)
+	if err = p.writeEcho(selected, raw); err != nil {
+		client <- internalErr(selected.ip, timestamp, err)
 		return seq, true
 	}
 	begin := time.Now()
@@ -350,15 +357,15 @@ func (p *Ping) pingOnChannel(
 	n, err := p.pingRead(timeoutCtx, buffer)
 	duration := time.Since(begin)
 	if err != nil && errors.Is(err, timeout) {
-		client <- packetLoss(selectedIP, timestamp, Timeout)
+		client <- packetLoss(selected.ip, timestamp, Timeout)
 		return seq, true
 	} else if err != nil {
-		client <- internalErr(selectedIP, timestamp, errors.Wrapf(err, "couldn't read packet from %q", p.currentURL))
+		client <- internalErr(selected.ip, timestamp, errors.Wrapf(err, "couldn't read packet from %q", p.currentURL))
 		return seq, true
 	}
 	received, err := icmp.ParseMessage(protocolICMP, buffer[:n])
 	if err != nil {
-		client <- internalErr(selectedIP, timestamp, errors.Wrapf(err, "couldn't parse raw packet from %q, %+v", p.currentURL, received))
+		client <- internalErr(selected.ip, timestamp, errors.Wrapf(err, "couldn't parse raw packet from %q, %+v", p.currentURL, received))
 		return seq, true
 	}
 	switch received.Type {
@@ -366,10 +373,10 @@ func (p *Ping) pingOnChannel(
 		// Clear the buffer for next packet
 		bytes.Clear(buffer, n)
 		seq++ // Deliberate wrap-around
-		client <- goodPacket(selectedIP, duration, timestamp)
+		client <- goodPacket(selected.ip, duration, timestamp)
 		return seq, false
 	default:
-		client <- packetLoss(selectedIP, timestamp, BadResponse)
+		client <- packetLoss(selected.ip, timestamp, BadResponse)
 		return seq, true
 	}
 }
@@ -417,17 +424,15 @@ func (p *Ping) makeOutgoingPacket(seq uint16) ([]byte, error) {
 	return raw, nil
 }
 
-func (p *Ping) writeEcho(selectedIP net.IP, raw []byte) error {
-	udpDst := &net.UDPAddr{IP: selectedIP}
-	if _, err := p.connect.WriteTo(raw, udpDst); err != nil {
+func (p *Ping) writeEcho(selectedIP *addr, raw []byte) error {
+	if _, err := p.connect.WriteTo(raw, selectedIP.Get()); err != nil {
 		return errors.Wrapf(err, "couldn't write packet to connection %q", p.currentURL)
 	}
 	return nil
 }
 
 func (p *Ping) startListening(url string) (closer func(), err error) {
-	// TODO supporting windows (privileges etc)
-	p.connect, err = p.evalListeningOptions()
+	p.connect, p.addrType, err = p.evalListeningOptions()
 	p.currentURL = url
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't listen")
@@ -436,29 +441,6 @@ func (p *Ping) startListening(url string) (closer func(), err error) {
 		p.connect.Close()
 		p.currentURL = ""
 	}, nil
-}
-
-func isIpv4(ip net.IP) bool {
-	const IPv4len = 4
-	const IPv6len = 16
-	isZeros := func(p net.IP) bool {
-		for i := range p {
-			if p[i] != 0 {
-				return false
-			}
-		}
-		return true
-	}
-	if len(ip) == IPv4len {
-		return true
-	}
-	if len(ip) == IPv6len &&
-		isZeros(ip[0:10]) &&
-		ip[10] == 0xff &&
-		ip[11] == 0xff {
-		return true
-	}
-	return false
 }
 
 func (dct DNSCacheTrust) String() string {
@@ -473,28 +455,28 @@ func (dct DNSCacheTrust) String() string {
 	panic("exhaustive:enforce")
 }
 
-func (p *Ping) evalListeningOptions() (*icmp.PacketConn, error) {
+func (p *Ping) evalListeningOptions() (*icmp.PacketConn, addressType, error) {
 	errs := []error{}
 	for _, listenCfg := range listenList {
 		conn, err := icmp.ListenPacket(listenCfg.network, listenCfg.address)
 		if conn != nil && err == nil {
-			return conn, nil
+			return conn, listenCfg.addressType, nil
 		}
 	}
 	strs := sliceutils.Map(errs, func(e error) string {
 		return e.Error() + "\n"
 	})
-	return nil, errors.New("couldn't listen for ping packets:\n" + strings.Join(strs, "- "))
+	return nil, 0, errors.New("couldn't listen for ping packets:\n" + strings.Join(strs, "- "))
 }
 
 var ipv4ListenAddr = net.IPv4zero
 var ipv6ListenAddr = net.IPv6zero
 
 var listenList = []listenerConfig{
-	{network: "udp4", address: ipv4ListenAddr.String()},
-	{network: "udp6", address: ipv6ListenAddr.String()},
-	{network: "ip4:1", address: ipv4ListenAddr.String()},
-	{network: "ip6:ipv6-icmp", address: ipv6ListenAddr.String()},
+	{network: "udp4", address: ipv4ListenAddr.String(), addressType: _UDP4},
+	{network: "udp6", address: ipv6ListenAddr.String(), addressType: _UDP6},
+	{network: "ip4:1", address: ipv4ListenAddr.String(), addressType: _IP4},
+	{network: "ip6:ipv6-icmp", address: ipv6ListenAddr.String(), addressType: _IP6},
 
 	// TODO add and support:
 	//	- ip4:icmp
@@ -505,4 +487,32 @@ var listenList = []listenerConfig{
 
 type listenerConfig struct {
 	network, address string
+	addressType
+}
+
+type addressType int
+
+// we use underscores here because we don't want to export these constants, but uppercase makes for better acronyms.
+//
+//nolint:staticcheck
+const (
+	_IP4  addressType = 1
+	_UDP4 addressType = 2
+	_IP6  addressType = 3
+	_UDP6 addressType = 4
+)
+
+func (at addressType) String() string {
+	switch at {
+	case _IP4:
+		return "IP4"
+	case _IP6:
+		return "IP6"
+	case _UDP4:
+		return "UDP4"
+	case _UDP6:
+		return "UDP6"
+	default:
+		return "unknown"
+	}
 }

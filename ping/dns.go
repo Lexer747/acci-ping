@@ -32,18 +32,18 @@ type queryCache struct {
 func (q *queryCache) GetLastIP() string {
 	q.m.Lock()
 	defer q.m.Unlock()
-	return q.store[q.index].ip.String()
+	return q.store[q.index].addr.String()
 }
 
 // Get will return an IP for use which is not considered stale and true. If the cache is exhausted an all IPs
 // are stale then it will return nil and false.
-func (q *queryCache) Get() (net.IP, bool) {
+func (q *queryCache) Get() (*addr, bool) {
 	q.m.Lock()
 	defer q.m.Unlock()
 	// If there's only one IP to pick from then we can do a more simple lookup.
 	if len(q.store) == 1 {
 		if !q.store[0].stale {
-			return q.store[0].ip, true
+			return q.store[0].addr, true
 		}
 		return nil, false
 	}
@@ -51,7 +51,7 @@ func (q *queryCache) Get() (net.IP, bool) {
 	for start := q.index; start != q.index; q.advance() {
 		r := q.store[q.index]
 		if !r.stale {
-			return r.ip, true
+			return r.addr, true
 		}
 	}
 	// No non-stale IPs found
@@ -60,13 +60,13 @@ func (q *queryCache) Get() (net.IP, bool) {
 
 // Dropped tells this cache that the passed IP dropped a packet. Once enough drops have occurred for a given
 // IP in the cache then the cache will consider that IP stale. Panic's if the IP isn't in the cache.
-func (q *queryCache) Dropped(IP net.IP) {
+func (q *queryCache) Dropped(addr *addr) {
 	q.m.Lock()
 	defer q.m.Unlock()
 	// We could keep the cache sorted and use binary searches, but for now we consider this a cold path and so
 	// do not optimise for it.
 	index := slices.IndexFunc(q.store, func(q queryCacheItem) bool {
-		return q.ip.Equal(IP)
+		return q.addr.Equal(addr.ip)
 	})
 	check.Check(index != -1, "Unknown IP")
 
@@ -74,7 +74,7 @@ func (q *queryCache) Dropped(IP net.IP) {
 	cur := q.store[index]
 	stale := cur.dropCount > q.maxDrops
 	q.store[q.index] = queryCacheItem{
-		ip:        cur.ip,
+		addr:      cur.addr,
 		stale:     stale,
 		dropCount: cur.dropCount + 1,
 	}
@@ -85,17 +85,17 @@ func (q *queryCache) advance() {
 }
 
 type queryCacheItem struct {
-	ip        net.IP
+	addr      *addr
 	stale     bool
 	dropCount uint
 }
 
-// IPv4DNSQuery builds a new [ping.queryCache] for a given URL. If no IPv4 addresses are found then an error
-// is returned. The max drops specifies to the cache how many dropped packets an address is allowed before we
+// DNSQuery builds a new [ping.queryCache] for a given URL. If no valid addresses are found then an error is
+// returned. The max drops specifies to the cache how many dropped packets an address is allowed before we
 // consider that address too un-reliable, services may rotate their addresses in which case this cache will
 // clear itself of these now defunct addresses. If maxDrops is 0, then only a single dropped packet will mean
 // the address is considered stale.
-func IPv4DNSQuery(url string, maxDrops uint) (*queryCache, error) {
+func DNSQuery(url string, addrType addressType, maxDrops uint) (*queryCache, error) {
 	ips, err := net.LookupIP(url)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't DNS query %q", url)
@@ -106,16 +106,27 @@ func IPv4DNSQuery(url string, maxDrops uint) (*queryCache, error) {
 
 	results := make([]net.IP, 0, len(ips))
 	for _, ip := range ips {
-		if isIpv4(ip) {
-			results = append(results, ip)
-			break
+		switch addrType {
+		case _IP4, _UDP4:
+			if isIpv4(ip) {
+				results = append(results, ip)
+				goto EXIT
+			}
+		case _IP6, _UDP6:
+			if isIpv6(ip) {
+				results = append(results, ip)
+				goto EXIT
+			}
+		default:
+			panic("unknown socket")
 		}
 	}
+EXIT:
 	if len(results) == 0 {
-		return nil, errors.Errorf("Couldn't resolve %q to valid IPv4 address, ipv6 addresses are not supported", url)
+		return nil, errors.Errorf("Couldn't resolve %q to valid IP address", url)
 	}
 
-	cache := sliceutils.Map(results, func(ip net.IP) queryCacheItem { return queryCacheItem{ip: ip} })
+	cache := sliceutils.Map(results, func(ip net.IP) queryCacheItem { return queryCacheItem{addr: New(addrType, ip)} })
 	return &queryCache{
 		m:        &sync.Mutex{},
 		store:    cache,

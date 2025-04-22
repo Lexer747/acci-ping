@@ -18,14 +18,20 @@ import (
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/graph"
 	"github.com/Lexer747/acci-ping/graph/data"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	termTh "github.com/Lexer747/acci-ping/graph/terminal/th"
 	graphTh "github.com/Lexer747/acci-ping/graph/th"
+	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/terminal"
+	termTh "github.com/Lexer747/acci-ping/terminal/th"
 	"github.com/Lexer747/acci-ping/utils/env"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 )
+
+func init() {
+	themes.LoadTheme(themes.NoTheme)
+	graph.StartUp()
+}
 
 const (
 	inputPath  = "data/testdata/input"

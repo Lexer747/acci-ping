@@ -1,0 +1,15 @@
+{
+    "name": "light",
+    "version": "1.0.0",
+    "colours": {
+        "primary": "Black",
+        "secondary": "Gray",
+        "highlight": "DarkYellow",
+        "emphasis": "DarkCyan",
+        "title-highlight": "DarkMagenta",
+        "positive": "Green",
+        "dark-positive": "DarkGreen",
+        "negative": "Red",
+        "dark-negative": "DarkRed"
+    }
+}

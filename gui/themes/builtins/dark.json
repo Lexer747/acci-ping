@@ -1,0 +1,15 @@
+{
+    "name": "dark",
+    "version": "1.0.0",
+    "colours": {
+        "primary": "White",
+        "secondary": "Gray",
+        "highlight": "Yellow",
+        "emphasis": "Cyan",
+        "title-highlight": "Magenta",
+        "positive": "Green",
+        "dark-positive": "DarkGreen",
+        "negative": "Red",
+        "dark-negative": "DarkRed"
+    }
+}

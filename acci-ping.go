@@ -16,13 +16,13 @@ import (
 	"github.com/Lexer747/acci-ping/cmd/subcommands/drawframe"
 	"github.com/Lexer747/acci-ping/cmd/subcommands/ping"
 	"github.com/Lexer747/acci-ping/cmd/subcommands/rawdata"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/exit"
 )
 
-// these looking more bash variables helps clue me into where these actually come from which is build time linking, see build.sh.
+// these looking more bash variables helps clue me into where these actually come from which is build time linking, see tools/build.sh.
 //
 //nolint:staticcheck
 var (

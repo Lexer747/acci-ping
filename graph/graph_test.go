@@ -16,9 +16,9 @@ import (
 
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/graph"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/th"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/th"
 	"github.com/Lexer747/acci-ping/utils/env"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"

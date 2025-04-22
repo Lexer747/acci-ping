@@ -9,8 +9,8 @@ package acciping
 import (
 	"sync"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
 	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 

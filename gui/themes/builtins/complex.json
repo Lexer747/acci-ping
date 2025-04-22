@@ -1,0 +1,33 @@
+{
+    "name": "complex",
+    "version": "1.0.0",
+    "colours": {
+        "primary": {
+            "8-bit": 15
+        },
+        "secondary": {
+            "8-bit": 243
+        },
+        "highlight": {
+            "8-bit": 227
+        },
+        "emphasis": {
+            "8-bit": 87
+        },
+        "title-highlight": {
+            "8-bit": 199
+        },
+        "positive": {
+            "24-bit": "#30FF02"
+        },
+        "dark-positive": {
+            "24-bit": {
+                "r": 30,
+                "g": 117,
+                "b": 11
+            }
+        },
+        "negative": "Red",
+        "dark-negative": "DarkRed"
+    }
+}

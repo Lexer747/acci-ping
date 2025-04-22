@@ -9,15 +9,18 @@ package acciping
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"math/rand/v2"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Lexer747/acci-ping/draw"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
 	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/utils/sliceutils"
 )
 
 // toastNotifications which should only be called once the paint buffer is initialised.
@@ -39,6 +42,8 @@ func (app *Application) toastNotifications(ctx context.Context, terminalSizeUpda
 			if toShow == nil {
 				continue
 			}
+			slog.Info("New Error being shown", "err", toShow)
+
 			// A new error has been surfaced:
 			store.Lock()
 			// First generate a unique id for this error and add it to our map.
@@ -48,7 +53,7 @@ func (app *Application) toastNotifications(ctx context.Context, terminalSizeUpda
 			store.Unlock()
 			// Now after some timeout, remove the notification and re-render
 			go func() {
-				<-time.After(10 * time.Second)
+				<-time.After(20 * time.Second)
 				store.Lock()
 				delete(store.toasts, key)
 				app.paint(store.render(app.term.GetSize(), toastBuffer))
@@ -97,7 +102,7 @@ func (ts toastStore) render(size terminal.Size, b *bytes.Buffer) paintUpdate {
 		return ret
 	}
 	toasts := ts.orderToasts()
-	box := makeBox(toasts)
+	box := makeBox(size, toasts)
 	box.Draw(size, b)
 	return ret | Paint
 }
@@ -114,17 +119,32 @@ func (ts toastStore) orderToasts() []toast {
 	return order
 }
 
-const title = "An Error Occurred"
+const title = "⚠️  An Error Occurred ⚠️"
 
-func makeBox(ts []toast) gui.Box {
+func makeBox(size terminal.Size, ts []toast) gui.Box {
 	text := make([]gui.Typography, 0, len(ts)+1)
-	text = append(text, gui.Typography{ToPrint: ansi.Red(title), TextLen: len(title), Alignment: gui.Centre})
+	text = append(text, gui.Typography{ToPrint: themes.Negative(title), TextLen: len(title) - 10, Alignment: gui.Centre})
+	// TODO wrap differently when this might be ontop/underneath the help box.
+	maxSize := (size.Width * 3) / 4
 	for _, t := range ts {
-		text = append(text, gui.Typography{
-			ToPrint:   " ⚠️  " + t.err + "  ⚠️ ",
-			TextLen:   8 + len(t.err),
-			Alignment: gui.Centre,
-		})
+		for line := range strings.SplitSeq(t.err, "\n") {
+			if len([]rune(line)) >= maxSize {
+				// TODO split on spaces instead ...
+				for _, splitLine := range sliceutils.SplitN([]rune(line), maxSize) {
+					text = append(text, gui.Typography{
+						ToPrint:        string(splitLine),
+						LenFromToPrint: true,
+						Alignment:      gui.Centre,
+					})
+				}
+			} else {
+				text = append(text, gui.Typography{
+					ToPrint:        line,
+					LenFromToPrint: true,
+					Alignment:      gui.Centre,
+				})
+			}
+		}
 	}
 	return gui.Box{
 		BoxText: text,

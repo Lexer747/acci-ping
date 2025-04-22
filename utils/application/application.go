@@ -13,8 +13,12 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
+	"strings"
 
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/utils/check"
+	"github.com/Lexer747/acci-ping/utils/errors"
 )
 
 type BuildInfo struct {
@@ -116,4 +120,58 @@ func InitMemProfile(memprofile string) (toDefer func()) {
 		doMemProfile()
 		f.Close()
 	}
+}
+
+func LoadTheme(themeStr string, term *terminal.Terminal) error {
+	theme, ok := themes.LookupTheme(themeStr)
+	if !ok {
+		colour, ok := term.BackgroundColour()
+		// https://github.com/microsoft/terminal/issues/3718
+		if !ok && strings.Contains(runtime.GOOS, "windows") {
+			// best bet is too read the json profile
+			// https://learn.microsoft.com/en-us/windows/terminal/install#settings-json-file (3 locations)
+			windows, ok := tryParseWindowsTerminalSettings()
+			if ok {
+				colour = windows
+			}
+		}
+		theme = themes.GetDefault(colour)
+		var err error
+		theme, err = loadFileTheme(themeStr, theme)
+		if err != nil {
+			return err
+		}
+	}
+	themes.LoadTheme(theme)
+	return nil
+}
+
+// LoadFileTheme takes the config and tries to treat the theme config value as a path from which to read all
+// the values a theme needs. This lets the program support custom themes.
+func loadFileTheme(themeStr string, fallBack themes.Theme) (t themes.Theme, err error) {
+	f, err := os.Open(themeStr)
+	defer func() {
+		if f != nil {
+			err = f.Close()
+		}
+	}()
+	// We assume that no file passed means the default option, any other error implies that something went
+	// wrong and the user may want to action this problem
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fallBack, errors.Wrapf(err, "failed to load theme from path %q", themeStr)
+	} else if err != nil && errors.Is(err, os.ErrNotExist) {
+		// swallow this error and carry on
+		return fallBack, nil
+	}
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return fallBack, errors.Wrapf(err, "failed to load theme from path %q", themeStr)
+	}
+
+	loaded, err := themes.ParseThemeFromJSON(data)
+	if err != nil {
+		return fallBack, errors.Wrapf(err, "failed to load theme from path %q", themeStr)
+	}
+	return loaded, nil
 }

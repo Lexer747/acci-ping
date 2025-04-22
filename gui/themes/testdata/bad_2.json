@@ -1,0 +1,16 @@
+{
+    "colours": {
+        "primary": "Foo",
+        "secondary": "Bar",
+        "emphasis": {
+            "8-bit": -128390123
+        },
+        "title-highlight": {},
+        "positive": {
+            "9-bit": "Red"
+        },
+        "dark-positive": "DarkGreen",
+        "negative": "Red",
+        "dark-negative": "DarkRed"
+    }
+}

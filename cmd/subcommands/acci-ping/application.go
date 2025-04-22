@@ -20,10 +20,11 @@ import (
 	"github.com/Lexer747/acci-ping/files"
 	"github.com/Lexer747/acci-ping/graph"
 	"github.com/Lexer747/acci-ping/graph/data"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
 	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/backoff"
 	"github.com/Lexer747/acci-ping/utils/channels"
 	"github.com/Lexer747/acci-ping/utils/errors"
@@ -142,7 +143,12 @@ func (app *Application) Run(
 	return graph()
 }
 
-func (app *Application) Init(ctx context.Context, c Config) (channel <-chan ping.PingResults, existingData *data.Data) {
+func appThemeStartUp() {
+	helpStartup()
+	graph.StartUp()
+}
+
+func (app *Application) Init(ctx context.Context, c Config) (<-chan ping.PingResults, *data.Data) {
 	app.config = c
 	app.errorChannel = make(chan error)
 	app.controlPlane = make(chan graph.Control)
@@ -152,17 +158,22 @@ func (app *Application) Init(ctx context.Context, c Config) (channel <-chan ping
 	app.term, err = terminal.NewTerminal()
 	exit.OnError(err) // If we can't open the terminal for any reason we reasonably can't do anything this program offers.
 
+	var existingData *data.Data
 	if *c.filePath != "" {
 		existingData, app.toUpdate = loadFile(*c.filePath, *c.url)
 	} else {
 		existingData = data.NewData(*c.url)
 	}
 
-	channel, err = p.CreateChannel(ctx, existingData.URL, *c.pingsPerMinute, *c.pingBufferingLimit)
+	channel, err := p.CreateChannel(ctx, existingData.URL, *c.pingsPerMinute, *c.pingBufferingLimit)
 	// If Creating the channel has an error this means we cannot continue, the network errors are already
 	// wrapped and retried by this channel, other errors imply some larger problem
 	exit.OnError(err)
-	return
+	err = application.LoadTheme(*c.theme, app.term)
+	appThemeStartUp()
+	go func() { app.errorChannel <- err }()
+
+	return channel, existingData
 }
 
 func (app *Application) Finish() {
@@ -212,7 +223,7 @@ func (app *Application) makeErrorGenerator() {
 		return nil
 	})
 	helpCopy = append(helpCopy,
-		gui.Typography{ToPrint: "Press " + ansi.Green("e") + " to generate a test error.", TextLen: 6 + 1 + 26, Alignment: gui.Left},
+		gui.Typography{ToPrint: "Press " + themes.Positive("e") + " to generate a test error.", TextLen: 6 + 1 + 26, Alignment: gui.Left},
 	)
 }
 

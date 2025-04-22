@@ -85,3 +85,19 @@ func Remove[S ~[]T, T comparable](slice S, elements ...T) S {
 	}
 	return ret
 }
+
+// SplitN converts a slice in to slices of length at most [splitAfterN], where each return slice is cut from
+// the original input slice.
+func SplitN[S ~[]T, T any](slice S, splitAfterN int) []S {
+	splits := len(slice) / splitAfterN
+	if len(slice)%splitAfterN != 0 {
+		splits++
+	}
+	ret := make([]S, splits)
+	for i := range splits {
+		end := min(len(slice), splitAfterN)
+		ret[i] = slice[:end]
+		slice = slice[end:]
+	}
+	return ret
+}

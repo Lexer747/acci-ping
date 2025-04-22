@@ -18,9 +18,9 @@ import (
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/graph/data"
 	"github.com/Lexer747/acci-ping/graph/graphdata"
-	"github.com/Lexer747/acci-ping/graph/terminal"
 	"github.com/Lexer747/acci-ping/gui"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 
@@ -73,8 +73,13 @@ type GraphConfiguration struct {
 	DebugStrict    bool
 
 	// Optionals:
-
 	Data *data.Data
+}
+
+func StartUp() {
+	xAxisStartup()
+	yAxisStartup()
+	drawWindowStartUp()
 }
 
 func NewGraph(ctx context.Context, cfg GraphConfiguration) *Graph {

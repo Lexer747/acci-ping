@@ -12,6 +12,7 @@ linters:
     - forbidigo
     - funlen
     - gochecknoglobals
+    - gochecknoinits
     - gocritic
     - godot
     - godox
@@ -21,6 +22,8 @@ linters:
     - nolintlint
     - nonamedreturns
     - revive
+    - tagliatelle
+    - tparallel
     - unparam
     - varnamelen
     - wrapcheck

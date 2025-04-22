@@ -9,9 +9,10 @@ package graph
 import (
 	"time"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
-	"github.com/Lexer747/acci-ping/graph/terminal/typography"
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
+	"github.com/Lexer747/acci-ping/terminal/typography"
 )
 
 var spinnerArray = [...]string{
@@ -29,5 +30,5 @@ func spinner(s terminal.Size, spinnerIndex int, timeBetweenFrames time.Duration)
 	if x != 0 && int(175/x) != 0 {
 		a = spinnerIndex / int(175/x)
 	}
-	return ansi.CursorPosition(1, s.Width-3) + ansi.Cyan(spinnerArray[a%len(spinnerArray)])
+	return ansi.CursorPosition(1, s.Width-3) + themes.Emphasis(spinnerArray[a%len(spinnerArray)])
 }

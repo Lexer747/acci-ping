@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 

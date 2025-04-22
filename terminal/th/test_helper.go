@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
+	"github.com/Lexer747/acci-ping/terminal"
 	"gotest.tools/v3/assert"
 )
 

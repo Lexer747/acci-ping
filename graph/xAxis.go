@@ -13,10 +13,11 @@ import (
 
 	"github.com/Lexer747/acci-ping/graph/data"
 	"github.com/Lexer747/acci-ping/graph/graphdata"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
-	"github.com/Lexer747/acci-ping/graph/terminal/typography"
+	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
+	"github.com/Lexer747/acci-ping/terminal/typography"
 	"github.com/Lexer747/acci-ping/utils/numeric"
 	"github.com/Lexer747/acci-ping/utils/sliceutils"
 )
@@ -64,6 +65,14 @@ func (x *xAxisIter) Get(p ping.PingDataPoint) *XAxisSpanInfo {
 	return x.Get(p)
 }
 
+func xAxisStartup() {
+	padding = themes.Primary(typography.Horizontal)
+	origin = themes.TitleHighlight(typography.Bullet) + " "
+}
+
+var padding string
+var origin string
+
 func computeXAxis(
 	toWriteTo, toWriteSpanBars *bytes.Buffer,
 	s terminal.Size,
@@ -72,8 +81,6 @@ func computeXAxis(
 	followLatestSpan bool,
 	total int,
 ) drawingXAxis {
-	padding := ansi.White(typography.Horizontal)
-	origin := ansi.Magenta(typography.Bullet) + " "
 	space := s.Width - 6
 	remaining := space
 	// First add the initial dot for A E S T H E T I C S
@@ -122,11 +129,11 @@ func computeXAxis(
 			toCrop := max(min(span.width-2, len(start)-1), 0)
 			cropped := start[:toCrop]
 			remaining -= len(cropped) + 2
-			fmt.Fprintf(toWriteTo, "%s", ansi.Cyan(cropped))
+			fmt.Fprintf(toWriteTo, "%s", themes.Emphasis(cropped))
 			toWriteTo.WriteString(padding + padding)
 		} else {
 			remaining -= len(start) + 4 + 2
-			fmt.Fprintf(toWriteTo, "[ %s ]", ansi.Cyan(start))
+			fmt.Fprint(toWriteTo, themes.Primary("[ ")+themes.Emphasis(start)+themes.Primary(" ]"))
 			toWriteTo.WriteString(padding + padding)
 			remaining = xAxisDrawTimes(toWriteTo, times, remaining, padding)
 		}
@@ -218,7 +225,7 @@ func xAxisDrawTimes(b *bytes.Buffer, times []string, remaining int, padding stri
 		if remaining <= len(point) {
 			break
 		}
-		b.WriteString(ansi.Yellow(point))
+		b.WriteString(themes.Highlight(point))
 		remaining -= len(point)
 		if remaining <= 1 {
 			break

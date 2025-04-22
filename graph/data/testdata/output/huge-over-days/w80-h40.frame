@@ -1,4 +1,4 @@
-Ping www.google.com [μ 10.26ms | σ 1.555ms | Count 9918] W: 80 H: 40            
+Ping         www.google.com [μ 10.26ms | σ 1.555ms | Count 9918] W: 80 H: 40    
 │      █               ║          ▼ 56.999811ms               ║                 
 55.63ms█               ║          │                           ║                 
 │      █               ║          │                           ║                 

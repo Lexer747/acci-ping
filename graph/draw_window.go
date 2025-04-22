@@ -13,10 +13,11 @@ import (
 
 	"github.com/Lexer747/acci-ping/graph/data"
 	"github.com/Lexer747/acci-ping/graph/gradient"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
-	"github.com/Lexer747/acci-ping/graph/terminal/typography"
+	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
+	"github.com/Lexer747/acci-ping/terminal/typography"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 
@@ -81,8 +82,13 @@ func newDrawWindow(size terminal.Size, spans int, debugStrict bool) *drawWindow 
 	}
 }
 
-var drop = ansi.Red(typography.Block)
-var dropFiller = ansi.Red(typography.LightBlock)
+func drawWindowStartUp() {
+	drop = themes.Negative(typography.Block)
+	dropFiller = themes.Negative(typography.LightBlock)
+}
+
+var drop string
+var dropFiller string
 
 func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.Buffer) {
 	// These can be indeterministically (map order) drawn since we guarantee uniqueness of the coords,
@@ -108,9 +114,9 @@ func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.Buffe
 	for _, l := range dw.labels {
 		var addColour func(string) string
 		if l.colour == red {
-			addColour = ansi.Red
+			addColour = themes.Negative
 		} else {
-			addColour = ansi.Green
+			addColour = themes.Positive
 		}
 		if l.leftJustify {
 			// ensure that we don't write to a negative coord should the terminal be very small.
@@ -263,10 +269,10 @@ const (
 )
 
 var (
-	single = ansi.White(typography.Multiply)
-	few    = ansi.White(typography.SmallSquare)
-	many   = ansi.White(typography.Diamond)
-	loads  = ansi.White(typography.Square)
+	single = themes.Primary(typography.Multiply)
+	few    = themes.Primary(typography.SmallSquare)
+	many   = themes.Primary(typography.Diamond)
+	loads  = themes.Primary(typography.Square)
 
 	bar = ansi.Gray("|")
 )
@@ -290,19 +296,19 @@ func (dw *drawWindow) getOverlap(x, y int) string {
 // text needed to show the key for all the points drawn.
 func (dw *drawWindow) getKey(toWriteTo *bytes.Buffer) {
 	if dw.max > loadsThreshold {
-		fmt.Fprintf(toWriteTo, ansi.Gray("Key")+ansi.White(": ")+
+		fmt.Fprintf(toWriteTo, themes.Secondary("Key")+themes.Primary(": ")+
 			single+" = %d "+bar+" "+few+" = %d-%d "+bar+" "+many+" = %d-%d "+bar+" "+loads+" = %d+    ",
 			fewThreshold, fewThreshold+1, manyThreshold, manyThreshold+1, loadsThreshold, loadsThreshold+1)
 		return
 	}
 	if dw.max > manyThreshold {
-		fmt.Fprintf(toWriteTo, ansi.Gray("Key")+ansi.White(": ")+
+		fmt.Fprintf(toWriteTo, themes.Secondary("Key")+themes.Primary(": ")+
 			single+" = %d "+bar+" "+few+" = %d-%d "+bar+" "+many+" = %d-%d    ",
 			fewThreshold, fewThreshold+1, manyThreshold, manyThreshold+1, loadsThreshold)
 		return
 	}
 	if dw.max > fewThreshold {
-		fmt.Fprintf(toWriteTo, ansi.Gray("Key")+ansi.White(": ")+
+		fmt.Fprintf(toWriteTo, themes.Secondary("Key")+themes.Primary(": ")+
 			single+" = %d "+bar+" "+few+" = %d-%d    ",
 			fewThreshold, fewThreshold+1, manyThreshold)
 		return

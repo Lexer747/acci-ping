@@ -9,8 +9,8 @@ package gradient
 import (
 	"fmt"
 
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
-	"github.com/Lexer747/acci-ping/graph/terminal/typography"
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal/typography"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 
@@ -182,5 +182,5 @@ func (g Solution) Draw() string {
 	default:
 		panic(fmt.Sprintf("unexpected gradient %d", g))
 	}
-	return ansi.Gray(ret)
+	return themes.Secondary(ret)
 }

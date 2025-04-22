@@ -17,10 +17,11 @@ import (
 	"github.com/Lexer747/acci-ping/graph/data"
 	"github.com/Lexer747/acci-ping/graph/gradient"
 	"github.com/Lexer747/acci-ping/graph/graphdata"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
-	"github.com/Lexer747/acci-ping/graph/terminal/typography"
+	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
+	"github.com/Lexer747/acci-ping/terminal/typography"
 	"github.com/Lexer747/acci-ping/utils"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/numeric"
@@ -318,20 +319,20 @@ func shouldGradient(runs *data.Runs) bool {
 func makeTitle(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats, url string) {
 	const yAxisTitle = "Ping "
 	sizeStr := size.String()
-	titleBegin := ansi.Cyan(url)
-	titleEnd := ansi.Green(sizeStr)
+	titleBegin := themes.Emphasis(url)
+	titleEnd := themes.Positive(sizeStr)
 	remaining := size.Width - len(yAxisTitle) - len(url) - len(sizeStr)
 	statsStr := stats.PickString(remaining)
 	if len(statsStr) > 0 {
-		statsStr = " [" + statsStr + "] "
+		statsStr = " [" + themes.Primary(statsStr) + "] "
 	}
 	title := titleBegin + statsStr + titleEnd
 	titleIndent := (size.Width / 2) - (len(title) / 2)
 	toWriteTo.WriteString(
-		ansi.Home + ansi.Magenta(yAxisTitle) + ansi.CursorForward(titleIndent) + title,
+		ansi.Home + themes.TitleHighlight(yAxisTitle) + ansi.CursorForward(titleIndent) + title,
 	)
 	if drawingDebug {
-		toWriteTo.WriteString(ansi.CursorPosition(1, size.Width-1) + ansi.DarkRed(typography.LightBlock))
+		toWriteTo.WriteString(ansi.CursorPosition(1, size.Width-1) + themes.DarkNegative(typography.LightBlock))
 	}
 }
 

@@ -11,9 +11,9 @@ import (
 	"context"
 
 	"github.com/Lexer747/acci-ping/draw"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
 	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal"
 )
 
 // help which should only be called once the paint buffer is initialised.
@@ -36,9 +36,9 @@ func (app *Application) help(
 			switch toShow {
 			case 'h':
 				h.showHelp = !h.showHelp
+				app.paint(h.render(app.term.GetSize(), helpBuffer))
 			default:
 			}
-			app.paint(h.render(app.term.GetSize(), helpBuffer))
 		}
 	}
 }
@@ -81,10 +81,22 @@ func (h help) makeHelpBox() gui.Box {
 	}
 }
 
-var helpCopy = []gui.Typography{
-	{ToPrint: ansi.Yellow("Help"), TextLen: 4, Alignment: gui.Centre},
-	{ToPrint: "", TextLen: 0, Alignment: gui.Centre},
-	{ToPrint: "Press " + ansi.Green("ctrl+c") + " to exit.", TextLen: 6 + 6 + 9, Alignment: gui.Left},
-	{ToPrint: "Press " + ansi.Green("f") + " to follow the most recent data.", TextLen: 6 + 1 + 32, Alignment: gui.Left},
-	{ToPrint: "Press " + ansi.Green("h") + " to open/close this window.", TextLen: 6 + 1 + 27, Alignment: gui.Left},
+func helpStartup() {
+	helpText := themes.Highlight("Help")
+	ctrlCText := themes.Positive("ctrl+c")
+	keyBindF := themes.Positive("f")
+	keyBindH := themes.Positive("h")
+
+	helpCopy = []gui.Typography{
+		{ToPrint: helpText, TextLen: 4, Alignment: gui.Centre},
+		{ToPrint: "", TextLen: 0, Alignment: gui.Centre},
+		{ToPrint: themes.Primary("Press ") + ctrlCText + themes.Primary(" to exit."),
+			TextLen: 6 + 6 + 9, Alignment: gui.Left},
+		{ToPrint: themes.Primary("Press ") + keyBindF + themes.Primary(" to follow the most recent data."),
+			TextLen: 6 + 1 + 32, Alignment: gui.Left},
+		{ToPrint: themes.Primary("Press ") + keyBindH + themes.Primary(" to open/close this window."),
+			TextLen: 6 + 1 + 27, Alignment: gui.Left},
+	}
 }
+
+var helpCopy = make([]gui.Typography, 0, 10)

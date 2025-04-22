@@ -12,8 +12,8 @@ import (
 
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/graph"
-	"github.com/Lexer747/acci-ping/graph/terminal"
 	"github.com/Lexer747/acci-ping/gui"
+	"github.com/Lexer747/acci-ping/terminal"
 )
 
 // showControls which should only be called once the paint buffer is initialised.

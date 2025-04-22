@@ -9,9 +9,11 @@ package acciping
 import (
 	"context"
 	"flag"
+	"strings"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/errors"
@@ -29,6 +31,7 @@ type Config struct {
 	pingsPerMinute     *float64
 	testErrorListener  *bool
 	url                *string
+	theme              *string
 
 	*application.BuildInfo
 	*flag.FlagSet
@@ -46,11 +49,17 @@ func GetFlags(info *application.BuildInfo) *Config {
 		memprofile:         f.String("memprofile", "", "write memory profile to `file`"),
 		pingBufferingLimit: new(int),
 		pingsPerMinute: f.Float64("pings-per-minute", 60.0,
-			"sets the speed at which the program will try to get new ping results, 0 represents no limit."+
-				" Negative values are an error."),
+			"sets the speed at which the program will try to get new ping results, 0 represents no limit.\n"+
+				"Negative values are an error."),
 		testErrorListener: f.Bool("debug-error-creator", false,
-			"binds the ["+ansi.Yellow("e")+"] key to create errors for GUI verification"),
-		url:     f.String("url", "www.google.com", "the url to target for ping testing"),
+			"binds the ["+ansi.Blue("e")+"] key to create errors for GUI verification"),
+		url: f.String("url", "www.google.com", "the url to target for ping testing"),
+		theme: f.String("theme", "", "the colour theme (either a path or builtin theme name) to use for the program,\n"+
+			"if empty this will try to get the background colour of the terminal and pick the\n"+
+			"built in dark or light theme based on the colour found.\n"+
+			"There's also the builtin list of themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
+			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
+			" for how to create custom themes."),
 		FlagSet: f,
 	}
 	*ret.pingBufferingLimit = 10

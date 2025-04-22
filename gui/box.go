@@ -12,8 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
 )
 
 type Box struct {
@@ -140,7 +141,7 @@ type corners struct {
 func (s Style) getVertical() string {
 	switch s {
 	case RoundedCorners, SharpCorners:
-		return "│"
+		return themes.Primary("│")
 	case NoBorder:
 		return ""
 	default:
@@ -151,7 +152,7 @@ func (s Style) getVertical() string {
 func (s Style) getHorizontal() string {
 	switch s {
 	case RoundedCorners, SharpCorners:
-		return "─"
+		return themes.Primary("─")
 	case NoBorder:
 		return ""
 	default:
@@ -162,11 +163,21 @@ func (s Style) getHorizontal() string {
 func (s Style) getCorner() corners {
 	switch s {
 	case RoundedCorners:
-		return corners{TopLeft: "╭", TopRight: "╮", BottomLeft: "╰", BottomRight: "╯"}
+		return corners{
+			TopLeft:     themes.Primary("╭"),
+			TopRight:    themes.Primary("╮"),
+			BottomLeft:  themes.Primary("╰"),
+			BottomRight: themes.Primary("╯"),
+		}
 	case SharpCorners:
-		return corners{TopLeft: "┌", TopRight: "┐", BottomLeft: "└", BottomRight: "┘"}
+		return corners{
+			TopLeft:     themes.Primary("┌"),
+			TopRight:    themes.Primary("┐"),
+			BottomLeft:  themes.Primary("└"),
+			BottomRight: themes.Primary("┘"),
+		}
 	case NoBorder:
-		return corners{TopLeft: "", TopRight: "", BottomLeft: "", BottomRight: ""}
+		return corners{}
 	default:
 		panic("unknown box style: " + s.String())
 	}

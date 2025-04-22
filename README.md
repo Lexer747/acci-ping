@@ -21,6 +21,12 @@ program via the normal control-c.
         sets the speed at which the program will try to get new ping results, 0 represents no limit. Negative values are an error. (default 60)
 * `-url [url]`
         the url to target for ping testing (default `www.google.com`)
+* `-theme string`
+        the colour theme (either a path or builtin theme name) to use for the program, if empty this will try
+        to get the background colour of the terminal and pick the built in dark or light theme based on the
+        colour found.
+        <br>
+        See the docs [LINK HERE](https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md) for how to create custom themes.
 
 
 <details>
@@ -84,13 +90,17 @@ build it locally.
 <details>
 <summary><b>🪟 Windows</b></summary>
 
-TODO Windows
+This should just work! Download the binaries from `release link here`, add package to win-get, etc
+
+![](images/WindowsTerminal_vaip1qU25v.png)
 </details>
 
 <details>
 <summary><b>🍎 Mac/Apple</b></summary>
 
-TODO Apple
+This should also just work! Download the binaries from `release link here`, add package to `brew`, etc
+
+Tested on an M1 arm mac.
 </details>
 
 

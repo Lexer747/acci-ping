@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
+	"github.com/Lexer747/acci-ping/terminal"
 )
 
 // Typography implements the [Draw] interface and knows how to draw text to the screen. Note that it only

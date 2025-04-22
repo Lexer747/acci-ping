@@ -12,14 +12,19 @@ import (
 	"time"
 
 	"github.com/Lexer747/acci-ping/graph/data"
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
-	"github.com/Lexer747/acci-ping/graph/terminal/typography"
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
+	"github.com/Lexer747/acci-ping/terminal/typography"
 	"github.com/Lexer747/acci-ping/utils/numeric"
 	"github.com/Lexer747/acci-ping/utils/timeutils"
 )
 
-var spanBar = ansi.Cyan(typography.DoubleVertical)
+func yAxisStartup() {
+	spanBar = themes.Emphasis(typography.DoubleVertical)
+}
+
+var spanBar string
 
 func addYAxisVerticalSpanIndicator(bars *bytes.Buffer, s terminal.Size, spans []*XAxisSpanInfo) {
 	spanSeparator := makeBar(spanBar, s, true)
@@ -53,13 +58,13 @@ func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats
 		if i%gapSize == 1 {
 			scaledDuration := numeric.NormalizeToRange(float64(i), float64(size.Height-2), 0, float64(stats.Min), float64(stats.Max))
 			toPrint := timeutils.HumanString(time.Duration(scaledDuration), durationSize)
-			fmt.Fprint(toWriteTo, ansi.Yellow(toPrint))
+			fmt.Fprint(toWriteTo, themes.Highlight(toPrint))
 		} else {
-			fmt.Fprint(toWriteTo, ansi.White(typography.Vertical))
+			fmt.Fprint(toWriteTo, themes.Primary(typography.Vertical))
 		}
 	}
 	// Last line is always a bar
-	fmt.Fprint(toWriteTo, ansi.CursorPosition(max(1, size.Height-1), 1)+ansi.White(typography.Vertical))
+	fmt.Fprint(toWriteTo, ansi.CursorPosition(max(1, size.Height-1), 1)+themes.Primary(typography.Vertical))
 	return drawingYAxis{
 		size:      size.Height,
 		stats:     stats,

@@ -12,8 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
-	"github.com/Lexer747/acci-ping/graph/terminal/ansi"
+	"github.com/Lexer747/acci-ping/gui/themes"
+	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/terminal/ansi"
 )
 
 // A small demo of the terminal API, this program will emit a terminal sized line every time it hears a key,
@@ -33,7 +34,7 @@ func main() {
 		Action: func(r rune) error {
 			halfSize := (t.GetSize().Width - 21) / 2
 			toPrint := fmt.Sprintf("W:%-5dH:%-5dR:%-5s", t.GetSize().Width, t.GetSize().Height, strconv.QuoteRune(r))
-			line := strings.Repeat(".", halfSize) + ansi.Yellow(toPrint) + strings.Repeat(".", halfSize)
+			line := strings.Repeat(".", halfSize) + themes.Highlight(toPrint) + strings.Repeat(".", halfSize)
 			if t.GetSize().Width%2 == 0 {
 				line += "."
 			} else {

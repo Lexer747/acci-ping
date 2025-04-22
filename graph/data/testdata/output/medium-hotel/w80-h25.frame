@@ -1,5 +1,5 @@
-Ping www.google.com [μ 5.936682ms | σ 4.577167ms | Packet Count 337] W: 80 H: 25
-│                                               34.520042ms ▼                   
+Ping   www.google.com [μ 5.936682ms | σ 4.577167ms | Packet Count 337] W: 80 H: 
+│5                                              34.520042ms ▼                   
 33.15ms                                                    │                    
 │                                                          │                    
 │                                                       ×  │                    

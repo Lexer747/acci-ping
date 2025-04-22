@@ -10,7 +10,7 @@ import (
 	"bytes"
 	"strconv"
 
-	"github.com/Lexer747/acci-ping/graph/terminal"
+	"github.com/Lexer747/acci-ping/terminal"
 )
 
 // GUI is the abstract notion of all the components which make up the GUI, providing two methods, the "state"

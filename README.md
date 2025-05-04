@@ -83,24 +83,28 @@ All of these sub commands have their specific command line flags which can be sh
 
 ## Installation
 
-Right now this is still an area of improvement, the plan is too release and package binaries for all 3 main
-platforms but for now it's still in development, to run you will need to have the `go` compiler installed and
-build it locally.
+Download the latest and greatest pre-built binaries from here https://github.com/Lexer747/acci-ping/releases
+and then add them to your `PATH`, probably renaming the binary to just `acci-ping` and then you're ready to
+go!
 
 <details>
 <summary><b>🪟 Windows</b></summary>
 
-This should just work! Download the binaries from `release link here`, add package to win-get, etc
+This should just work! Download the binaries from https://github.com/Lexer747/acci-ping/releases
 
 ![](images/WindowsTerminal_vaip1qU25v.png)
+
+TODO adding releases to winget, etc
 </details>
 
 <details>
 <summary><b>🍎 Mac/Apple</b></summary>
 
-This should also just work! Download the binaries from `release link here`, add package to `brew`, etc
+This should also just work! Download the binaries from https://github.com/Lexer747/acci-ping/releases
 
 Tested on an M1 arm mac.
+
+TODO add package to `brew`, etc
 </details>
 
 

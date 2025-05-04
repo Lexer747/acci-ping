@@ -38,7 +38,7 @@ for i in "${SUPPORTED_TUPLES[@]}"; do
 	echo "Building	GOOS=$1	GOARCH=$2"
 	mkdir -p "$1/$2" &> /dev/null
 	pushd "$1/$2" &> /dev/null || exit
-	env GOOS=$1 GOARCH=$2 go build -ldflags "$FLAG" github.com/Lexer747/acci-ping
+	env GOOS=$1 GOARCH=$2 go build -ldflags "$FLAG" -o "acci-ping-$1-$2" github.com/Lexer747/acci-ping
 	chmod +x acci-ping*
 	if [[ "$SIGNING_KEY" != "not set" ]]; then
 		openssl dgst -sha256 -sign "$SIGNING_KEY" -out "$1-$2.sig" acci-ping*

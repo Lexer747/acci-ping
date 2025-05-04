@@ -30,6 +30,7 @@ var (
 	GO_VERSION string
 	BRANCH     string
 	TIMESTAMP  string
+	TAG        string
 )
 
 var programName = ansi.Green("acci-ping")
@@ -65,7 +66,7 @@ var mainDescription = programName + " can run be with no arguments to start the 
 	" To exit simply kill the program via the normal control-c."
 
 func main() {
-	info := application.MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP)
+	info := application.MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP, TAG)
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case drawframeString:

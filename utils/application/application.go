@@ -26,11 +26,12 @@ type BuildInfo struct {
 	goVersion string
 	branch    string
 	timestamp string
+	tag       string
 }
 
 //nolint:staticcheck
-func MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP string) *BuildInfo {
-	if COMMIT == "" && GO_VERSION == "" && BRANCH == "" && TIMESTAMP == "" {
+func MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP, TAG string) *BuildInfo {
+	if COMMIT == "" && GO_VERSION == "" && BRANCH == "" && TIMESTAMP == "" && TAG == "" {
 		return nil
 	}
 	return &BuildInfo{
@@ -38,6 +39,7 @@ func MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP string) *BuildInfo {
 		goVersion: GO_VERSION,
 		branch:    BRANCH,
 		timestamp: TIMESTAMP,
+		tag:       TAG,
 	}
 }
 
@@ -55,6 +57,7 @@ func InitLogging(file string, info *BuildInfo) (toDefer func()) {
 				"BRANCH", info.branch,
 				"GO_VERSION", info.goVersion,
 				"BUILD_TIMESTAMP", info.timestamp,
+				"TAG", info.tag,
 			)
 		}
 		slog.SetDefault(logger)

@@ -23,3 +23,5 @@ dev.pings
 
 ## Ignore Build Files:
 out/
+# signing key
+acci-ping-rsa4096.pem

@@ -159,7 +159,7 @@ func TestCompactLargeData(t *testing.T) {
 	testCompacter(t, testData, &data.Data{})
 }
 
-func testCompacter(t th.T, start data.Compact, empty data.Compact) {
+func testCompacter(t th.T, start, empty data.Compact) {
 	t.Helper()
 	var b bytes.Buffer
 	err := start.AsCompact(&b)

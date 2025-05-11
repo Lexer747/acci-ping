@@ -9,6 +9,7 @@ package data_test
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -166,7 +167,7 @@ func TestCompactRun_Property(t *testing.T) {
 		)
 		testRun := &data.Run{}
 		for i := range size {
-			if rapid.Bool().Draw(t, fmt.Sprintf("%d", i)) {
+			if rapid.Bool().Draw(t, strconv.Itoa(i)) {
 				testRun.Inc(int64(i))
 			} else {
 				testRun.Reset()
@@ -193,7 +194,7 @@ func TestCompactRuns_Property(t *testing.T) {
 		)
 		testRuns := &data.Runs{GoodPackets: &data.Run{}, DroppedPackets: &data.Run{}}
 		for i := range size {
-			testRuns.AddPoint(int64(i), ping.PingDataPoint{DropReason: drawPingDropped(t, fmt.Sprintf("%d", i))})
+			testRuns.AddPoint(int64(i), ping.PingDataPoint{DropReason: drawPingDropped(t, strconv.Itoa(i))})
 		}
 		testCompacter(t, testRuns, &data.Runs{})
 	})

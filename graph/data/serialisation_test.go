@@ -22,11 +22,7 @@ import (
 
 func TestCompactTimeSpan(t *testing.T) {
 	t.Parallel()
-	testSpan := &data.TimeSpan{
-		Begin: time.UnixMilli(1000),
-		End:   time.UnixMilli(2000),
-	}
-	testSpan.Duration = testSpan.End.Sub(testSpan.Begin)
+	testSpan := makeTestTimeSpan(1000, 2000)
 	testCompacter(t, testSpan, &data.TimeSpan{})
 }
 
@@ -163,7 +159,7 @@ func TestCompactLargeData(t *testing.T) {
 	testCompacter(t, testData, &data.Data{})
 }
 
-func testCompacter(t *testing.T, start data.Compact, empty data.Compact) {
+func testCompacter(t th.T, start data.Compact, empty data.Compact) {
 	t.Helper()
 	var b bytes.Buffer
 	err := start.AsCompact(&b)

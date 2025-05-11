@@ -16,6 +16,16 @@ export LOCAL_FRAME_DIFFS=1
 # Count=1 ensures no cached test results, which we want because some tests rely on networking results which
 # can never be cached as they rely other computers to pass/fail.
 go test -count=1 -race ./...
+testsExitCode=$?
 if [[ "$1" == "update" ]]; then
-	find . -name '*frame.actual' -exec bash -c 'mv -f $0 ${0/frame.actual/frame}; echo "updating $0"' {} \;
+	find . -name '*.actual' -exec bash -c '\
+	f=$(basename "$0" .actual) && \
+	ret="$(dirname "$0")"/"$f" && \
+	mv -f "$0" "$ret"; echo "updating $0"' {} \;
+fi
+if [ $testsExitCode -eq 0 ] || [[ "$1" == "update" ]]; then
+	# Do some clean up of files and folders which shouldn't be committed if the tests all passed, if the tests
+	# fail then we probably want to hand inspect the generated files to see what caused the test failure.
+	find . -name '*.no-commit-actual' -delete
+	find . -type d -empty -delete
 fi

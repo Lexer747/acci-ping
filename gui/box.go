@@ -8,7 +8,6 @@ package gui
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -75,28 +74,25 @@ type boxPosition struct {
 func (b Box) position(size terminal.Size) boxPosition {
 	p := b.Position
 	ret := boxPosition{}
-	switch {
-	case p.Horizontal == Centre && p.Vertical == Middle:
-		originX := size.Width / 2
+	switch p.Vertical {
+	case Middle:
 		originY := size.Height / 2
-		ret = boxPosition{
-			startY: originY - b.height(size)/2,
-			startX: originX - b.width(size)/2,
-		}
-	case p.Vertical == Middle && p.Horizontal == Right:
-		originY := size.Height / 2
-		ret = boxPosition{
-			startY: originY - b.height(size)/2,
-			startX: size.Width - b.width(size),
-		}
-	case p.Vertical == Top && p.Horizontal == Right:
-		ret = boxPosition{
-			startY: b.height(size),
-			startX: size.Width - b.width(size),
-		}
-	default:
-		panic(fmt.Sprintf("unhandled:box:position %+v", p))
+		ret.startY = originY - b.height(size)/2
+	case Top:
+		ret.startY = b.height(size)
+	case Bottom:
+		ret.startY = size.Height - b.height(size)
 	}
+	switch p.Horizontal {
+	case Centre:
+		originX := size.Width / 2
+		ret.startX = originX - b.width(size)/2
+	case Right:
+		ret.startX = size.Width - b.width(size)
+	case Left:
+		ret.startX = b.widthFromStyle()
+	}
+
 	if !p.Padding.Equal(NoPadding) {
 		ret.startY = ret.startY - p.Padding.Top + p.Padding.Bottom
 		ret.startX = ret.startX - p.Padding.Left + p.Padding.Right
@@ -105,7 +101,7 @@ func (b Box) position(size terminal.Size) boxPosition {
 }
 
 func (b Box) height(size terminal.Size) int {
-	return min(size.Height-1, len(b.BoxText))
+	return min(size.Height-1, b.heightFromStyle())
 }
 
 func (b Box) width(size terminal.Size) int {
@@ -121,6 +117,17 @@ func (b Box) boxTextWidth(size terminal.Size) int {
 		ret = max(ret, t.Len())
 	}
 	return ret
+}
+
+func (b Box) heightFromStyle() int {
+	switch b.Style {
+	case NoBorder:
+		return len(b.BoxText)
+	case RoundedCorners, SharpCorners:
+		return len(b.BoxText) + 2
+	default:
+		panic("unknown box style: " + b.Style.String())
+	}
 }
 
 func (b Box) widthFromStyle() int {

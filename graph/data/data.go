@@ -496,12 +496,16 @@ func (s *Stats) longString() string {
 type version byte
 
 const (
+	// ping files which come from commit 8368ecdbc7c3a7ea5b0e773990a724a3efae152d or earlier (since serialisation was added)
 	noRuns version = iota + 1
+	// ping files which come from commit 54a4f5f1bebd4695624262836248f80b9904cadd to current (as of writing)
 	runsWithNoIndex
+	// reserved as the moving end-cap. Keep this name when you add a new version, ensure [Data.write] produces
+	// the correct output for this version and that a new readVersion[N-1] is added.
 	currentDataVersion
 )
 
-func (d *Data) Migrate() {
+func (d *Data) migrate() {
 	startingVersion := d.PingsMeta
 	// Keep migrating until we are the current version, don't modify the starting version though, we want it preserved.
 	for {

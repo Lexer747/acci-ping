@@ -37,6 +37,10 @@ func TeeBufferedChannel[T any](ctx context.Context, c <-chan T, channelSize int)
 	return left, right
 }
 
+// FanInFanOut takes ownership of single channel of [T] and returns [fanOutCount] channels which all receive
+// the duplicated output of the original input channel. The actually fan out will be sent over multiple
+// go-routines so each returned channel will be updated in a random order. If the ctx is done then all
+// channels will be closed apart from the original input channel [c].
 func FanInFanOut[T any](ctx context.Context, c <-chan T, channelSize, fanOutCount int) (
 	Out []<-chan T,
 ) {

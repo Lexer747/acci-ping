@@ -18,8 +18,8 @@ import (
 	"github.com/Lexer747/acci-ping/graph"
 	"github.com/Lexer747/acci-ping/ping"
 	"github.com/Lexer747/acci-ping/terminal"
-	"github.com/Lexer747/acci-ping/terminal/th"
 	"github.com/Lexer747/acci-ping/utils/env"
+	"github.com/Lexer747/acci-ping/utils/th"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 )
@@ -235,8 +235,8 @@ func drawGraph(t *testing.T, size terminal.Size, input []ping.PingDataPoint) []s
 	defer closer()
 
 	actual := eval(t, g, input)
-	output := makeBuffer(size)
-	return playAnsiOntoStringBuffer(actual, output, size, false)
+	output := th.MakeBuffer(size)
+	return th.EmulateTerminal(actual, output, size, th.Panic)
 }
 
 func initTestGraph(t *testing.T, size terminal.Size) (*graph.Graph, func(), error) {

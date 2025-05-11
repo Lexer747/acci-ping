@@ -22,8 +22,8 @@ import (
 	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/ping"
 	"github.com/Lexer747/acci-ping/terminal"
-	termTh "github.com/Lexer747/acci-ping/terminal/th"
 	"github.com/Lexer747/acci-ping/utils/env"
+	"github.com/Lexer747/acci-ping/utils/th"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 )
@@ -42,7 +42,7 @@ type FileTest struct {
 	FileName         string
 	Sizes            []terminal.Size
 	TimeZoneOfFile   *time.Location
-	TerminalWrapping bool
+	TerminalWrapping th.TerminalWrapping
 }
 
 var StandardTestSizes = []terminal.Size{
@@ -130,7 +130,7 @@ func TestSmallWindows(t *testing.T) {
 			{Height: 8, Width: 8},
 		},
 		TimeZoneOfFile:   winter,
-		TerminalWrapping: true,
+		TerminalWrapping: th.WrapBuffer,
 	}.Run)
 }
 
@@ -188,9 +188,9 @@ func (ft FileTest) update(t *testing.T, size terminal.Size, actualStrings []stri
 	t.Log("Only call update drawing once")
 }
 
-func produceFrame(t *testing.T, size terminal.Size, data *data.Data, terminalWrapping bool) []string {
+func produceFrame(t *testing.T, size terminal.Size, data *data.Data, terminalWrapping th.TerminalWrapping) []string {
 	t.Helper()
-	stdin, _, term, setTerm, err := termTh.NewTestTerminal()
+	stdin, _, term, setTerm, err := th.NewTestTerminal()
 	setTerm(size)
 	ctx, cancel := context.WithCancel(t.Context())
 	// cancel this, we don't want the graph collecting from the channel in the background
@@ -206,6 +206,6 @@ func produceFrame(t *testing.T, size terminal.Size, data *data.Data, terminalWra
 		Data:          data,
 	})
 	defer func() { stdin.WriteCtrlC(t) }()
-	output := makeBuffer(size)
-	return playAnsiOntoStringBuffer(g.ComputeFrame(), output, size, terminalWrapping)
+	output := th.MakeBuffer(size)
+	return th.EmulateTerminal(g.ComputeFrame(), output, size, terminalWrapping)
 }

@@ -12,6 +12,7 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// RoundToNearestSigFig will round a float [input] to the specified number of significant figures
 func RoundToNearestSigFig(input float64, sigFig int) float64 {
 	if input == 0 {
 		return 0
@@ -61,7 +62,15 @@ func PowInt(start, base, input int) int {
 	}
 }
 
+// Exponent returns the base 10 exponent of the input number (aka the number of digits above the decimal
+// point), e.g. 10 returns 1, 100 returns 2, and 1e100 returns 100.
+//
+// Returns negative numbers for values below 0, e.g. 0.0001 returns -3.
 func Exponent(input float64) float64 {
+	// Edge case, if input is exactly zero the other math returns -Inf which is undesired.
+	if input == 0 {
+		return 0
+	}
 	return math.Ceil(math.Log10(math.Abs(input)))
 }
 

@@ -22,8 +22,11 @@ func New(addrType addressType, ip net.IP) *addr {
 		return &addr{ip: ip, asIP: &net.IPAddr{IP: ip}}
 	case _UDP4, _UDP6:
 		return &addr{ip: ip, asUDP: &net.UDPAddr{IP: ip, Port: 0}}
+	case _UNRESOLVED:
+		// Will be resolved later.
+		return &addr{ip: ip}
 	default:
-		return nil
+		panic("unknown addrType exhaustive:enforce")
 	}
 }
 

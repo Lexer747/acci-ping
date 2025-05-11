@@ -53,9 +53,22 @@ type Position struct {
 	Padding    Padding
 }
 
+func (p Position) String() string {
+	return "{Vertical: " + p.Vertical.String() +
+		" Horizontal: " + p.Horizontal.String() +
+		" Padding: " + p.Padding.String() + "}"
+}
+
 // Padding represents in pixels how many pixels should be offset in the given direction.
 type Padding struct {
 	Top, Bottom, Left, Right int
+}
+
+func (p Padding) String() string {
+	return "T:" + strconv.Itoa(p.Top) +
+		" B:" + strconv.Itoa(p.Bottom) +
+		" L:" + strconv.Itoa(p.Left) +
+		" R:" + strconv.Itoa(p.Right)
 }
 
 func (p Padding) Equal(other Padding) bool {

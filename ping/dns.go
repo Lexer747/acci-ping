@@ -7,13 +7,14 @@
 package ping
 
 import (
+	"context"
 	"net"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/errors"
-	"github.com/Lexer747/acci-ping/utils/sliceutils"
 )
 
 // queryCache provides an interface for Ping to consume in which we respect the wishes of the servers we are
@@ -26,6 +27,36 @@ type queryCache struct {
 	store    []queryCacheItem
 	index    int
 	maxDrops uint
+}
+
+func (q *queryCache) socketed(addrType addressType) {
+	check.Check(addrType != _UNRESOLVED, "cannot socket query cache to _UNRESOLVED")
+
+	results := make([]queryCacheItem, 0, len(q.store))
+	for _, item := range q.store {
+		switch addrType {
+		case _IP4, _UDP4:
+			if isIpv4(item.addr.ip) {
+				results = append(results, queryCacheItem{addr: New(addrType, item.addr.ip)})
+			}
+		case _IP6, _UDP6:
+			if isIpv6(item.addr.ip) {
+				results = append(results, queryCacheItem{addr: New(addrType, item.addr.ip)})
+			}
+		case _UNRESOLVED:
+			// already handled above
+		default:
+			panic("unknown socket type (exhaustive:enforce)")
+		}
+	}
+	// What I mean by this is that currently [Ping.evalListeningOptions] is greedy and just picks the first
+	// network type which it can succeeded at listening too, instead it should be informed by what IPs are
+	// returned. E.g. we can listen to [_UDP4] and [_UDP6], since the listen succeeds we pick [_UDP4], if the
+	// DNSQuery resolves to an IPv6 address which are pigeon holed to an incorrect configuration due to this
+	// panic here:
+	check.Check(len(results) > 0, "TODO evalListeningOptions should work with socketed"+
+		"\nMore accurately determining what network configuration we operate under")
+	q.store = results
 }
 
 // GetLastIP will return the last IP address this cache used, formatted according to [net.IP.String].
@@ -90,46 +121,97 @@ type queryCacheItem struct {
 	dropCount uint
 }
 
-// DNSQuery builds a new [ping.queryCache] for a given URL. If no valid addresses are found then an error is
+// _DNSQuery builds a new [ping.queryCache] for a given URL. If no valid addresses are found then an error is
 // returned. The max drops specifies to the cache how many dropped packets an address is allowed before we
 // consider that address too un-reliable, services may rotate their addresses in which case this cache will
 // clear itself of these now defunct addresses. If maxDrops is 0, then only a single dropped packet will mean
 // the address is considered stale.
-func DNSQuery(url string, addrType addressType, maxDrops uint) (*queryCache, error) {
+func _DNSQuery(url string, addrType addressType, maxDrops uint) (*queryCache, error) {
 	ips, err := net.LookupIP(url)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't DNS query %q", url)
+		return nil, errors.Wrapf(err, "couldn't get IP for %q (DNS failure)", url)
 	}
 	if len(ips) == 0 {
-		return nil, errors.Errorf("Couldn't resolve %q to any address. Network down?", url)
+		return nil, errors.Errorf("Couldn't resolve %q to any address. Network down? (DNS failure)", url)
 	}
 
-	results := make([]net.IP, 0, len(ips))
+	// Only use IPs which are of the socket type we're actually operating under. If unresolved we forward all IPs as successful.
+	results := make([]queryCacheItem, 0, len(ips))
 	for _, ip := range ips {
 		switch addrType {
 		case _IP4, _UDP4:
 			if isIpv4(ip) {
-				results = append(results, ip)
-				goto EXIT
+				results = append(results, queryCacheItem{addr: New(addrType, ip)})
 			}
 		case _IP6, _UDP6:
 			if isIpv6(ip) {
-				results = append(results, ip)
-				goto EXIT
+				results = append(results, queryCacheItem{addr: New(addrType, ip)})
 			}
+		case _UNRESOLVED:
+			results = append(results, queryCacheItem{addr: New(addrType, ip)})
 		default:
-			panic("unknown socket")
+			panic("unknown socket type (exhaustive:enforce)")
 		}
 	}
-EXIT:
 	if len(results) == 0 {
-		return nil, errors.Errorf("Couldn't resolve %q to valid IP address", url)
+		return nil, errors.Errorf("Couldn't resolve %q to a valid IP address (DNS failure)", url)
 	}
-
-	cache := sliceutils.Map(results, func(ip net.IP) queryCacheItem { return queryCacheItem{addr: New(addrType, ip)} })
 	return &queryCache{
 		m:        &sync.Mutex{},
-		store:    cache,
+		store:    results,
 		maxDrops: maxDrops,
 	}, nil
+}
+
+func (p *Ping) dnsRetry(
+	ctx context.Context,
+	url string,
+	client chan<- PingResults,
+	timestamp time.Time,
+	rateLimit *time.Ticker,
+	closer func(),
+) (*addr, func()) {
+	var err error
+	var newCloser func()
+	// I know that a goto and label looks scary but I assure you dear reader that this is sane, since our
+	// control flow and error handling path implies an infinite loop (Because we need to try listening for
+	// packets forever unless cancelled by the parent). This infinite loop is coupled to the results of the
+	// DNS query, therefore to truly retry against the network requires a loop around the two inner loops,
+	// which if done with a `for` construct is much less legible.
+HARD_RETRY:
+	if p.addresses == nil {
+		// Keeping doing a DNS query until we get a valid result, count each failure as a dropped packet
+		for p.addresses == nil {
+			// start again, do a new DNS query
+			p.addresses, err = _DNSQuery(url, _UNRESOLVED, p.dnsCacheTrust)
+			if err != nil {
+				client <- packetLoss(nil, timestamp, DNSFailure)
+				<-rateLimit.C
+				timestamp = time.Now()
+				p.addresses = nil
+			}
+		}
+		// Reset our listening, it's a chance our NIC died in which case we need to restart this.
+		// I don't think we can tell that the inner listener died.
+		closer()
+		for {
+			newCloser, err = p.startListening(url)
+			if err == nil {
+				p.addresses.socketed(p.addrType)
+				break
+			}
+			// Now is a sane point in the function to determine if the parent wants us to stop spinning our
+			// hamster wheel trying to find a packet. Overly checking this value is wasteful and unhelpful, we
+			// expect the ratelimited loop to do that the majority of the time.
+			if err := ctx.Err(); err != nil {
+				break
+			}
+		}
+	}
+	ip, ok := p.addresses.Get()
+	if !ok {
+		p.addresses = nil
+		goto HARD_RETRY // Avoid recursion, if we made it here either we have a fresh restart the entire address pool is exhausted
+	}
+	return ip, newCloser
 }

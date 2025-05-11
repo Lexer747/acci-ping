@@ -25,3 +25,10 @@ dev.pings
 out/
 # signing key
 acci-ping-rsa4096.pem
+
+# Rapid test data
+**/testdata/rapid/
+
+# Test outputs which are not GOLDEN's
+*.actual
+*.no-commit-actual

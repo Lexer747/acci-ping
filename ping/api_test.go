@@ -55,6 +55,6 @@ func TestUint16Wrapping(t *testing.T) {
 func networkingEnvGuard(t *testing.T) {
 	t.Helper()
 	if !env.SHOULD_TEST_NETWORK() {
-		t.Skip()
+		t.Skip("SHOULD_TEST_NETWORK disabled")
 	}
 }

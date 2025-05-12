@@ -14,7 +14,7 @@ import (
 
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
-	"github.com/Lexer747/acci-ping/terminal/th"
+	"github.com/Lexer747/acci-ping/utils/th"
 	"gotest.tools/v3/assert"
 )
 

@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
-package graph_test
+package th
 
 import (
 	"fmt"

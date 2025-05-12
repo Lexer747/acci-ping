@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
@@ -326,117 +325,6 @@ const (
 	foundSuccess backgroundDiscovered = 1
 	fallback     backgroundDiscovered = 2
 )
-
-// Expected response of the form `\e]11;COLOR\a`, where COLOR == `rgb:RRRR/GGGG/BBBB` and `R`, `G`, and
-// `B` are hex digits. (typically scaled up from the internal 24-bit representation)
-var expectedBGOutput = []byte(ansi.OSC + "11;rgb:RRRR/GGGG/BBBB        ")
-
-// tryGetBackgroundColour uses a somewhat standard xterm [ctlseqs] control sequences. To get the back ground
-// colour of the terminal. In this case it's collapsed to a single luminance value through the [themes]
-// package.
-//
-// In Chapter [OSC] there is special documentation about the `?` character which can be used as a query
-// instead of setting a value.
-//
-//	If a "?" is given rather than a name or RGB specification,
-//	xterm replies with a control sequence of the same form which
-//	can be used to set the corresponding dynamic color.
-//
-// [ctlseqs]: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
-// [OSC]: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands
-func (t *Terminal) tryGetBackgroundColour() bool {
-	if t.isTestTerminal {
-		return false
-	}
-	// First put the terminal in raw mode, this is needed so that we can intercept the output of the query
-	// from the terminal and it's not just printed unhelpfully for the user.
-	oldState, _ := term.MakeRaw(t.stdinFd)
-	// Always put the terminal back no matter if we succeeded or failed.
-	defer func() {
-		_ = term.Restore(t.stdinFd, oldState)
-	}()
-	// Since read may block forever (a unhelpful terminal for example) therefore we need a sane timeout here.
-	// Note that this does leak the go-routine if the terminal does actually never return.
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-
-	// the parser helper will encapsulate the reads for us, we can't use an [io.ReadAll] because from testing
-	// terminals don't return EOF at the end of the query (normally a null byte) so we need to do the reads
-	// ourself.
-	p := parser{
-		Ctx:          ctx,
-		Buffer:       make([]byte, len(expectedBGOutput)),
-		ToStreamFrom: t.stdout,
-	}
-	fail := func(err error) {
-		slog.Info("Failed to get background colour falling back to dark theme", "underlying reason", err.Error())
-	}
-	slog.Debug("Reading background colour query from terminal")
-
-	_, err := t.stdin.Write([]byte(ansi.OSC + "11;?\x07"))
-	if err != nil {
-		fail(err)
-		return false
-	}
-
-	// Since we are doing the read asynchronously and it may fail we get the results of the parsing from this
-	// channel instead of synchronously.
-	type rgb struct {
-		red, green, blue int
-	}
-	result := make(chan rgb)
-
-	go func() {
-		// TODO also support rgb:RR/GG/BB responses
-		// TODO also support rgba:RRRR/GGGG/BBBB/AAAA responses
-		// TODO also support rgba:0/0/BBBB/ responses (right now we parse 4 fixed digits)
-
-		// For now it's good enough to hard code only one valid parsing response.
-		defer close(result)
-		err := p.Consume([]byte("\x1b]11;rgb:"))
-		if err != nil {
-			fail(err)
-			return
-		}
-		red, err := p.ParseHex(4)
-		if err != nil {
-			fail(err)
-			return
-		}
-		err = p.Consume([]byte("/"))
-		if err != nil {
-			fail(err)
-			return
-		}
-		green, err := p.ParseHex(4)
-		if err != nil {
-			fail(err)
-			return
-		}
-		err = p.Consume([]byte("/"))
-		if err != nil {
-			fail(err)
-			return
-		}
-		blue, err := p.ParseHex(4)
-		if err != nil {
-			fail(err)
-			return
-		}
-		slog.Debug("done", "r", red, "g", green, "b", blue)
-		result <- rgb{red: red, green: green, blue: blue}
-	}()
-
-	// Now finally conclude this saga by waiting on the timeout signal or the valid result from the terminal.
-	select {
-	case <-ctx.Done():
-		fail(errors.Errorf("Timeout"))
-	case res := <-result:
-		t.backgroundColour = themes.ParseRGB_48bit(res.red, res.green, res.blue)
-		return true
-	}
-	return false
-}
 
 type listenResult struct {
 	n   int

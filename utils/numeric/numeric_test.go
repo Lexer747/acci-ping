@@ -8,8 +8,11 @@ package numeric_test
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
+
+	"pgregory.net/rapid"
 
 	"github.com/Lexer747/acci-ping/utils/numeric"
 	"github.com/Lexer747/acci-ping/utils/th"
@@ -54,4 +57,66 @@ func TestNormalize(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExponent_Property(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		var (
+			a = rapid.Float64().Draw(t, "a")
+			b = rapid.Float64().Draw(t, "b")
+		)
+		if numeric.Exponent(a)*numeric.Exponent(b) != numeric.Exponent(b)*numeric.Exponent(a) {
+			t.Fatalf("Exponent() is not commutative")
+		}
+	})
+	rapid.Check(t, func(t *rapid.T) {
+		var (
+			a = rapid.Float64().Draw(t, "a")
+		)
+		switch {
+		case math.Abs(a) <= 1 && math.Abs(a) >= 0:
+			if isPos(numeric.Exponent(a)) {
+				t.Fatalf("Exponent() numbers smaller than 0 should have negative exponents: %f", numeric.Exponent(a))
+			}
+		case math.Abs(a) > 1:
+			if isNeg(numeric.Exponent(a)) {
+				t.Fatalf("Exponent() numbers larger than 0 should have positive exponents: %f", numeric.Exponent(a))
+			}
+		default:
+			panic("uncovered case")
+		}
+	})
+}
+
+func TestNormalize_Property(t *testing.T) {
+	t.Parallel()
+	rapid.Check(t, func(t *rapid.T) {
+		var (
+			a = rapid.Float64().Draw(t, "a")
+		)
+		normalized := numeric.Normalize(a, -math.MaxFloat64, math.MaxFloat64)
+		if normalized < 0 || normalized > 1 {
+			t.Fatalf("Normalize() was not in [0, 1] range: %f", normalized)
+		}
+	})
+	rapid.Check(t, func(t *rapid.T) {
+		var (
+			a        = rapid.Float64().Draw(t, "a")
+			minInput = rapid.Float64().Draw(t, "min")
+			maxInput = rapid.Float64Min(minInput).Draw(t, "max")
+		)
+		normalized := numeric.NormalizeToRange(a, -math.MaxFloat64, math.MaxFloat64, minInput, maxInput)
+		if normalized < minInput || normalized > maxInput {
+			t.Fatalf("Normalize() was not in [%f, %f] range: %f", normalized, minInput, maxInput)
+		}
+	})
+}
+
+func isNeg(f float64) bool {
+	return f < 0
+}
+
+func isPos(f float64) bool {
+	return f > 0
 }

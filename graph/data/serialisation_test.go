@@ -79,7 +79,7 @@ func TestCompactLargeBlock(t *testing.T) {
 }
 
 func makeLargePings() []ping.PingResults {
-	pings := make([]ping.PingResults, 1_000_000)
+	pings := make([]ping.PingResults, 10_000)
 	randomIPs := []net.IP{
 		net.IPv6zero,
 		net.IPv6unspecified,

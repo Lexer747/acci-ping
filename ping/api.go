@@ -8,9 +8,10 @@ package ping
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math"
-	"math/rand/v2"
 	"net"
 	"os"
 	"time"
@@ -49,10 +50,15 @@ func (p *Ping) LastIP() string {
 //   - The URL changing IP address (load balancing)
 //   - rate limiting this client
 func NewPing() *Ping {
+	// This is probably overkill, but we do expose this number to the public internet so might as-well use
+	// this over math/rand
+	b := [2]byte{}
+	_, _ = rand.Read(b[:])
+	offset := binary.LittleEndian.Uint16(b[:])
 	return &Ping{
 		//nolint:gosec
 		// G115 overflow is expected and required
-		id: uint16(os.Getpid() + rand.Int()),
+		id: uint16(os.Getpid()) + offset,
 	}
 }
 

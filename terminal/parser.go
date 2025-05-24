@@ -20,9 +20,11 @@ import (
 	"golang.org/x/term"
 )
 
-// Expected response of the form `\e]11;COLOR\a`, where COLOR == `rgb:RRRR/GGGG/BBBB` and `R`, `G`, and
-// `B` are hex digits. (typically scaled up from the internal 24-bit representation)
-var expectedBGOutput = []byte(ansi.OSC + "11;rgb:RRRR/GGGG/BBBB<padding--------->")
+// Expected response of the form `\e]11;COLOR\a`, where COLOR == `rgb:RRRR/GGGG/BBBB` and `R`, `G`, and `B`
+// are hex digits. (typically scaled up from the internal 24-bit representation), padding is because we use
+// this to allocate a correctly sized buffer and we want some extra room incase we get more text than
+// expected.
+var expectedBGOutput = []byte(ansi.OSC + "11;rgb:RRRR/GGGG/BBBB<-----padding---->")
 
 // tryGetBackgroundColour uses a somewhat standard xterm [ctlseqs] control sequences. To get the back ground
 // colour of the terminal. In this case it's collapsed to a single luminance value through the [themes]

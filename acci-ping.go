@@ -16,6 +16,7 @@ import (
 	"github.com/Lexer747/acci-ping/cmd/subcommands/drawframe"
 	"github.com/Lexer747/acci-ping/cmd/subcommands/ping"
 	"github.com/Lexer747/acci-ping/cmd/subcommands/rawdata"
+	"github.com/Lexer747/acci-ping/cmd/subcommands/version"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/errors"
@@ -38,6 +39,7 @@ var programName = ansi.Green("acci-ping")
 const drawframeString = "drawframe"
 const rawdataString = "rawdata"
 const pingString = "ping"
+const versionString = "version"
 
 type subcommand struct {
 	subcommandName string
@@ -59,6 +61,11 @@ var commandsUsage = []subcommand{
 		subcommandName: ansi.Red(pingString),
 		description: programName + " " + ansi.Red(pingString) +
 			" will run like any other ping command line tool and print the plain text packet statistics to stdout.",
+	},
+	{
+		subcommandName: ansi.Red(versionString),
+		description: programName + " " + ansi.Red(versionString) +
+			" simply prints the version of this program.",
 	},
 }
 
@@ -83,6 +90,11 @@ func main() {
 			p := ping.GetFlags()
 			FlagParseError(p.Parse(os.Args[2:]))
 			ping.RunPing(p)
+			exit.Success()
+		case versionString:
+			p := version.GetFlags(info)
+			FlagParseError(p.Parse(os.Args[2:]))
+			version.RunVersion(p)
 			exit.Success()
 		default:
 			// fallthrough

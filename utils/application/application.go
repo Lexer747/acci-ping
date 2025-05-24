@@ -29,6 +29,26 @@ type BuildInfo struct {
 	tag       string
 }
 
+func (b BuildInfo) BuildTimestamp() string {
+	return b.timestamp
+}
+
+func (b BuildInfo) GoVersion() string {
+	return b.goVersion
+}
+
+func (b BuildInfo) Branch() string {
+	return b.branch
+}
+
+func (b BuildInfo) Commit() string {
+	return b.commit
+}
+
+func (b BuildInfo) Tag() string {
+	return b.tag
+}
+
 //nolint:staticcheck
 func MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP, TAG string) *BuildInfo {
 	if COMMIT == "" && GO_VERSION == "" && BRANCH == "" && TIMESTAMP == "" && TAG == "" {

@@ -78,6 +78,7 @@ is over half compared to CSV) as well as storing some extra meta data.
   142.250.179.228 | 2025-03-15T15:32:41.337992341Z | 8.831399ms
   142.250.179.228 | 2025-03-15T15:32:42.671321452Z | 8.817724ms
   ```
+* `acci-ping version` will print the version of acci-ping, please include this if you have any [issues](https://github.com/Lexer747/acci-ping/issues/new).
 
 All of these sub commands have their specific command line flags which can be shown with `-h` or `-help`.
 

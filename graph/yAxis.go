@@ -9,6 +9,7 @@ package graph
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/Lexer747/acci-ping/graph/data"
@@ -19,6 +20,31 @@ import (
 	"github.com/Lexer747/acci-ping/utils/numeric"
 	"github.com/Lexer747/acci-ping/utils/timeutils"
 )
+
+type drawingYAxis struct {
+	size      int
+	stats     *data.Stats
+	labelSize int
+	scale     YAxisScale
+}
+
+type YAxisScale byte
+
+const (
+	Linear      YAxisScale = 0
+	Logarithmic YAxisScale = 1
+)
+
+func (y YAxisScale) String() string {
+	switch y {
+	case Linear:
+		return "Linear"
+	case Logarithmic:
+		return "Logarithmic"
+	default:
+		panic("exhaustive:enforce")
+	}
+}
 
 func yAxisStartup() {
 	spanBar = themes.Emphasis(typography.DoubleVertical)
@@ -40,7 +66,13 @@ func addYAxisVerticalSpanIndicator(bars *bytes.Buffer, s terminal.Size, spans []
 	bars.WriteString(ansi.CursorPosition(s.Height, 1))
 }
 
-func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats, url string) drawingYAxis {
+func computeYAxis(
+	toWriteTo *bytes.Buffer,
+	size terminal.Size,
+	stats *data.Stats,
+	url string,
+	scale YAxisScale,
+) drawingYAxis {
 	toWriteTo.Grow(size.Height)
 
 	makeTitle(toWriteTo, size, stats, url)
@@ -56,7 +88,16 @@ func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats
 		h := i + 2
 		fmt.Fprint(toWriteTo, ansi.CursorPosition(h, 1))
 		if i%gapSize == 1 {
-			scaledDuration := numeric.NormalizeToRange(float64(i), float64(size.Height-2), 0, float64(stats.Min), float64(stats.Max))
+			var scaledDuration float64
+			switch scale {
+			case Linear:
+				scaledDuration = numeric.NormalizeToRange(float64(i+1), float64(size.Height-3), 2, float64(stats.Min), float64(stats.Max))
+			case Logarithmic:
+				logMin := math.Log(float64(stats.Min))
+				logMax := math.Log(float64(stats.Max))
+				logScaledTime := numeric.NormalizeToRange(float64(i+1), float64(size.Height-3), 2, logMin, logMax)
+				scaledDuration = math.Pow(math.E, logScaledTime)
+			}
 			toPrint := timeutils.HumanString(time.Duration(scaledDuration), durationSize)
 			fmt.Fprint(toWriteTo, themes.Highlight(toPrint))
 		} else {
@@ -69,17 +110,30 @@ func computeYAxis(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats
 		size:      size.Height,
 		stats:     stats,
 		labelSize: min(durationSize+4, size.Width),
+		scale:     scale,
 	}
 }
 
 func getY(dur time.Duration, yAxis drawingYAxis, s terminal.Size) int {
 	newMin := max(1, s.Height-2)
 	newMax := min(2, s.Height)
-	return int(numeric.NormalizeToRange(
-		float64(dur),
-		float64(yAxis.stats.Min),
-		float64(yAxis.stats.Max),
-		float64(newMin),
-		float64(newMax),
-	))
+	switch yAxis.scale {
+	case Linear:
+		return int(numeric.NormalizeToRange(
+			float64(dur),
+			float64(yAxis.stats.Min),
+			float64(yAxis.stats.Max),
+			float64(newMin),
+			float64(newMax),
+		))
+	case Logarithmic:
+		return int(numeric.NormalizeToRange(
+			math.Log(float64(dur)),
+			math.Log(float64(yAxis.stats.Min)),
+			math.Log(float64(yAxis.stats.Max)),
+			float64(newMin),
+			float64(newMax),
+		))
+	}
+	panic("exhaustive:enforce")
 }

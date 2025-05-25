@@ -27,11 +27,12 @@ import (
 func TestSmallDrawing(t *testing.T) {
 	t.Parallel()
 	test := DrawingTest{
-		Size: terminal.Size{Height: 5, Width: 20},
+		Size: terminal.Size{Height: 8, Width: 20},
 		Values: []ping.PingDataPoint{
 			{Duration: 1 * time.Second, Timestamp: time.Time{}.Add(1 * time.Second)},
 			{Duration: 2 * time.Second, Timestamp: time.Time{}.Add(2 * time.Second)},
 			{Duration: 3 * time.Second, Timestamp: time.Time{}.Add(3 * time.Second)},
+			//	{Duration: 4 * time.Second, Timestamp: time.Time{}.Add(4 * time.Second)},
 		},
 		ExpectedFile: "testdata/small.frame",
 	}

@@ -29,12 +29,13 @@ import (
 
 type Config struct {
 	cpuprofile  *string
-	debugStrict *bool
 	debugFollow *bool
+	debugStrict *bool
 	logFile     *string
 	memprofile  *string
 	termSize    *string
 	theme       *string
+	yAxisScale  *bool
 
 	*application.BuildInfo
 	*flag.FlagSet
@@ -57,14 +58,15 @@ func GetFlags(info *application.BuildInfo) *Config {
 			"There's also the builtin list of themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
 			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
 			" for how to create custom themes."),
-		FlagSet: f,
+		yAxisScale: f.Bool("log-scale", false, "switches the y-axis to be in logarithmic scaling instead of linear"),
+		FlagSet:    f,
 	}
 	f.Usage = func() {
 		w := flag.CommandLine.Output()
 		fmt.Fprintf(w, "Usage of %s: reads '.pings' files and outputs the final frame of the capture\n"+
 			"\t drawframe [options] FILE\n\n"+
 			"e.g. %s my_ping_capture.ping\n", os.Args[0], os.Args[0])
-		flag.PrintDefaults()
+		f.PrintDefaults()
 	}
 	return ret
 }
@@ -93,14 +95,14 @@ func RunDrawFrame(c *Config) {
 	graph.StartUp()
 
 	for _, path := range toPrint {
-		run(term, path, profiling, *c.debugFollow, *c.debugStrict)
+		run(term, path, profiling, *c.yAxisScale, *c.debugFollow, *c.debugStrict)
 	}
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
 }
 
-func run(term *terminal.Terminal, path string, profiling, debugFollow, debugStrict bool) {
+func run(term *terminal.Terminal, path string, profiling, logScale, debugFollow, debugStrict bool) {
 	fs, err := os.Stat(path)
 	exit.OnErrorMsgf(err, "Couldn't stat path %q, failed with", path)
 	if fs.IsDir() {
@@ -108,16 +110,16 @@ func run(term *terminal.Terminal, path string, profiling, debugFollow, debugStri
 			if filepath.Ext(p) != ".pings" {
 				return nil
 			}
-			do(p, term, profiling, debugFollow, debugStrict)
+			do(p, term, profiling, logScale, debugFollow, debugStrict)
 			return nil
 		})
 		exit.OnErrorMsgf(err, "Couldn't walk path %q, failed with", path)
 	} else {
-		do(path, term, profiling, debugFollow, debugStrict)
+		do(path, term, profiling, logScale, debugFollow, debugStrict)
 	}
 }
 
-func do(path string, term *terminal.Terminal, profiling, debugFollow, debugStrict bool) {
+func do(path string, term *terminal.Terminal, profiling, logScale, debugFollow, debugStrict bool) {
 	d, f, err := files.LoadFile(path)
 	exit.OnErrorMsg(err, "Couldn't open and read file, failed with")
 	f.Close()
@@ -130,7 +132,7 @@ func do(path string, term *terminal.Terminal, profiling, debugFollow, debugStric
 		timer := time.NewTimer(time.Second * 60)
 		running := true
 		for running {
-			printGraph(term, d, debugFollow, debugStrict)
+			printGraph(term, d, logScale, debugFollow, debugStrict)
 			select {
 			case <-timer.C:
 				running = false
@@ -138,7 +140,7 @@ func do(path string, term *terminal.Terminal, profiling, debugFollow, debugStric
 			}
 		}
 	} else {
-		printGraph(term, d, debugFollow, debugStrict)
+		printGraph(term, d, logScale, debugFollow, debugStrict)
 	}
 }
 
@@ -150,15 +152,20 @@ func makeTerminal(termSize *string) (*terminal.Terminal, error) {
 	}
 }
 
-func printGraph(term *terminal.Terminal, d *data.Data, debugFollow, debugStrict bool) {
+func printGraph(term *terminal.Terminal, d *data.Data, logScale, debugFollow, debugStrict bool) {
+	scale := graph.Linear
+	if logScale {
+		scale = graph.Logarithmic
+	}
 	g := graph.NewGraph(
 		context.Background(),
 		graph.GraphConfiguration{
 			Terminal:       term,
 			PingsPerMinute: 0,
 			DrawingBuffer:  draw.NewPaintBuffer(),
-			InitialControl: graph.Control{
-				FollowLatestSpan: debugFollow,
+			Presentation: graph.Presentation{
+				Following:  debugFollow,
+				YAxisScale: scale,
 			},
 			DebugStrict: debugStrict,
 			Data:        d,

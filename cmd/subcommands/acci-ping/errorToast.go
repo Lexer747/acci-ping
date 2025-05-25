@@ -119,11 +119,11 @@ func (ts toastStore) orderToasts() []toast {
 	return order
 }
 
-const title = "⚠️  An Error Occurred ⚠️"
+const title = " An Error Occurred "
 
 func makeBox(size terminal.Size, ts []toast) gui.Box {
 	text := make([]gui.Typography, 0, len(ts)+1)
-	text = append(text, gui.Typography{ToPrint: themes.Negative(title), TextLen: len(title) - 10, Alignment: gui.Centre})
+	text = append(text, gui.Typography{ToPrint: themes.Negative(title), TextLen: 19, Alignment: gui.Centre})
 	// TODO wrap differently when this might be ontop/underneath the help box.
 	maxSize := (size.Width * 3) / 4
 	for _, t := range ts {

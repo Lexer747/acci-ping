@@ -41,6 +41,7 @@ const (
 type FileTest struct {
 	FileName         string
 	Sizes            []terminal.Size
+	OnlyDoLinear     bool
 	TimeZoneOfFile   *time.Location
 	TerminalWrapping th.TerminalWrapping
 }
@@ -50,6 +51,7 @@ var StandardTestSizes = []terminal.Size{
 	{Height: 25, Width: 80},
 	{Height: 16, Width: 284}, // My small vscode window
 	{Height: 30, Width: 300}, // My average vscode window
+	{Height: 45, Width: 120}, // Tall vertical screen
 	{Height: 74, Width: 354}, // Fullscreen
 }
 
@@ -139,17 +141,23 @@ func (ft FileTest) Run(t *testing.T) {
 
 	d := graphTh.GetFromFile(t, ft.getInputFileName())
 	d = d.In(ft.TimeZoneOfFile)
-	for _, size := range ft.Sizes {
-		actualStrings := produceFrame(t, size, d, ft.TerminalWrapping)
+	yAxis := []graph.YAxisScale{graph.Linear}
+	if !ft.OnlyDoLinear {
+		yAxis = append(yAxis, graph.Logarithmic)
+	}
+	for _, y := range yAxis {
+		for _, size := range ft.Sizes {
+			actualStrings := produceFrame(t, size, d, y, ft.TerminalWrapping)
 
-		// ft.update(t, size, actualStrings)
-		ft.assertEqual(t, size, actualStrings)
+			// ft.update(t, y, size, actualStrings)
+			ft.assertEqual(t, y, size, actualStrings)
+		}
 	}
 }
 
-func (ft FileTest) assertEqual(t *testing.T, size terminal.Size, actualStrings []string) {
+func (ft FileTest) assertEqual(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, actualStrings []string) {
 	t.Helper()
-	outputFile := ft.getOutputFileName(size)
+	outputFile := ft.getOutputFileName(yAxis, size)
 	expectedBytes, err := os.ReadFile(outputFile)
 	assert.NilError(t, err)
 	actualJoined := strings.Join(actualStrings, "\n")
@@ -172,14 +180,17 @@ func (ft FileTest) assertEqual(t *testing.T, size terminal.Size, actualStrings [
 func (ft FileTest) getInputFileName() string {
 	return fmt.Sprintf("%s/%s.pings", inputPath, ft.FileName)
 }
-func (ft FileTest) getOutputFileName(size terminal.Size) string {
-	return fmt.Sprintf("%s/%s/w%d-h%d.frame", outputPath, ft.FileName, size.Width, size.Height)
+func (ft FileTest) getOutputFileName(yAxis graph.YAxisScale, size terminal.Size) string {
+	if ft.OnlyDoLinear {
+		return fmt.Sprintf("%s/%s/w%d-h%d.frame", outputPath, ft.FileName, size.Width, size.Height)
+	}
+	return fmt.Sprintf("%s/%s/%s-w%d-h%d.frame", outputPath, ft.FileName, yAxis, size.Width, size.Height)
 }
 
 //nolint:unused
-func (ft FileTest) update(t *testing.T, size terminal.Size, actualStrings []string) {
+func (ft FileTest) update(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, actualStrings []string) {
 	t.Helper()
-	outputFile := ft.getOutputFileName(size)
+	outputFile := ft.getOutputFileName(yAxis, size)
 	err := os.MkdirAll(path.Dir(outputFile), 0o777)
 	assert.NilError(t, err)
 	err = os.WriteFile(outputFile, []byte(strings.Join(actualStrings, "\n")), 0o777)
@@ -188,7 +199,13 @@ func (ft FileTest) update(t *testing.T, size terminal.Size, actualStrings []stri
 	t.Log("Only call update drawing once")
 }
 
-func produceFrame(t *testing.T, size terminal.Size, data *data.Data, terminalWrapping th.TerminalWrapping) []string {
+func produceFrame(
+	t *testing.T,
+	size terminal.Size,
+	data *data.Data,
+	yAxis graph.YAxisScale,
+	terminalWrapping th.TerminalWrapping,
+) []string {
 	t.Helper()
 	stdin, _, term, setTerm, err := th.NewTestTerminal()
 	setTerm(size)
@@ -204,6 +221,7 @@ func produceFrame(t *testing.T, size terminal.Size, data *data.Data, terminalWra
 		DrawingBuffer: draw.NewPaintBuffer(),
 		DebugStrict:   true,
 		Data:          data,
+		Presentation:  graph.Presentation{YAxisScale: yAxis},
 	})
 	defer func() { stdin.WriteCtrlC(t) }()
 	output := th.MakeBuffer(size)

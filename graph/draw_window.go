@@ -32,6 +32,8 @@ type drawWindow struct {
 	labels      []label
 	debugStrict bool
 	max         int
+
+	idx int
 }
 
 // coords are the unique key to identify some data to be drawn
@@ -72,6 +74,7 @@ type colour int
 const (
 	red colour = iota
 	green
+	cyan
 )
 
 func newDrawWindow(size terminal.Size, spans int, debugStrict bool) *drawWindow {
@@ -113,10 +116,13 @@ func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.Buffe
 	// If these are drawn indeterministically then we will get shimmer as labels may be fighting for Z-Preference
 	for _, l := range dw.labels {
 		var addColour func(string) string
-		if l.colour == red {
+		switch l.colour {
+		case red:
 			addColour = themes.Negative
-		} else {
+		case green:
 			addColour = themes.Positive
+		case cyan:
+			addColour = themes.Emphasis
 		}
 		if l.leftJustify {
 			// ensure that we don't write to a negative coord should the terminal be very small.
@@ -137,11 +143,14 @@ func (dw *drawWindow) addPoint(
 	spanWidth int,
 	x, y, centreX int,
 ) {
+	defer func() { dw.idx++ }()
 	isMin := p.Duration == stats.Min
 	isMax := p.Duration == stats.Max
 	isMinWithinSpan := p.Duration == spanStats.Min
 	isMaxWithinSpan := p.Duration == spanStats.Max
 	wideEnough := spanWidth > averageLabelSize
+	// TODO configure this somehow
+	// rng := dw.idx%50 == 100
 	needsLabel := (wideEnough && (isMinWithinSpan || isMaxWithinSpan)) || isMin || isMax
 	dw.add(x, y, needsLabel)
 	if !needsLabel {
@@ -166,6 +175,10 @@ func (dw *drawWindow) addPoint(
 		colour = red
 		symbol = typography.FilledDownTriangle
 	}
+	// if rng {
+	// 	colour = cyan
+	// 	symbol = typography.Bullet
+	// }
 	if needsLabel {
 		label := p.Duration.String()
 		dw.addLabel(x, y, leftJustify, symbol, label, colour)

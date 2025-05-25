@@ -21,7 +21,11 @@ func (g *Graph) AddPoint(p ping.PingResults) {
 
 func (g *Graph) ComputeFrame() string {
 	var b strings.Builder
-	painter := g.computeFrame(0, false, false)
+	painter := g.computeFrame(computeFrameConfig{
+		followLatestSpan: false,
+		drawSpinner:      false,
+		yAxisScale:       g.presentation.YAxisScale,
+	})
 	err := painter(&b)
 	check.NoErr(err, "While painting frame to string buffer")
 	return b.String()

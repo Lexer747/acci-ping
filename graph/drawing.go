@@ -27,6 +27,13 @@ import (
 	"github.com/Lexer747/acci-ping/utils/numeric"
 )
 
+type computeFrameConfig struct {
+	timeBetweenFrames time.Duration
+	followLatestSpan  bool
+	drawSpinner       bool
+	yAxisScale        YAxisScale
+}
+
 const drawingDebug = false
 
 func getTimeBetweenFrames(fps int, pingsPerMinute float64) time.Duration {
@@ -39,7 +46,7 @@ func getTimeBetweenFrames(fps int, pingsPerMinute float64) time.Duration {
 
 var noFrame = func(w io.Writer) error { return nil }
 
-func (g *Graph) computeFrame(timeBetweenFrames time.Duration, followLatestSpan, drawSpinner bool) func(io.Writer) error {
+func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 	// This is race-y so ensure a consistent size for rendering, don't allow each sub-frame to re-compute the
 	// size of the terminal. Side note - we deliberately don't attach this to the terminal size channel since
 	// it's locked to the targeted FPS of this frame time anyway so just adds extra work.
@@ -51,13 +58,13 @@ func (g *Graph) computeFrame(timeBetweenFrames time.Duration, followLatestSpan, 
 		return noFrame // no data yet
 	}
 	spinnerValue := ""
-	if drawSpinner {
+	if cfg.drawSpinner {
 		g.lastFrame.spinnerIndex++
-		spinnerValue = spinner(s, g.lastFrame.spinnerIndex, timeBetweenFrames)
+		spinnerValue = spinner(s, g.lastFrame.spinnerIndex, cfg.timeBetweenFrames)
 		g.drawingBuffer.Get(draw.SpinnerIndex).Reset()
 		g.drawingBuffer.Get(draw.SpinnerIndex).WriteString(spinnerValue)
 	}
-	if count == g.lastFrame.PacketCount && g.lastFrame.Match(s, followLatestSpan) {
+	if count == g.lastFrame.PacketCount && g.lastFrame.Match(s, cfg.followLatestSpan) {
 		g.data.Unlock() // fast path the frame didn't change
 		if updateGui := g.checkGUI(); updateGui != nil {
 			return updateGui
@@ -71,21 +78,21 @@ func (g *Graph) computeFrame(timeBetweenFrames time.Duration, followLatestSpan, 
 	g.drawingBuffer.Reset(draw.GraphIndexes...)
 
 	header := g.data.LockFreeHeader()
-	iter := g.data.LockFreeIter(followLatestSpan)
+	iter := g.data.LockFreeIter(cfg.followLatestSpan)
 	x := computeXAxis(
 		g.drawingBuffer.Get(draw.XAxisIndex),
 		g.drawingBuffer.Get(draw.BarIndex),
 		s,
 		header.TimeSpan,
 		g.data.LockFreeSpanInfos(),
-		followLatestSpan,
+		cfg.followLatestSpan,
 		int(iter.Total),
 	)
 	yStats := header.Stats
-	if followLatestSpan {
+	if cfg.followLatestSpan {
 		yStats = x.spans[0].pingStats
 	}
-	y := computeYAxis(g.drawingBuffer.Get(draw.YAxisIndex), s, yStats, g.data.LockFreeURL())
+	y := computeYAxis(g.drawingBuffer.Get(draw.YAxisIndex), s, yStats, g.data.LockFreeURL(), cfg.yAxisScale)
 	computeFrame(
 		g,
 		g.drawingBuffer.Get(draw.GradientIndex),
@@ -108,7 +115,7 @@ func (g *Graph) computeFrame(timeBetweenFrames time.Duration, followLatestSpan, 
 		spinnerIndex:      g.lastFrame.spinnerIndex,
 		framePainter:      paintFrame,
 		framePainterNoGui: noGUI,
-		followLatestSpan:  followLatestSpan,
+		followLatestSpan:  cfg.followLatestSpan,
 	}
 
 	return paintFrame

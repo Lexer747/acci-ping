@@ -22,12 +22,6 @@ import (
 	"github.com/Lexer747/acci-ping/utils/sliceutils"
 )
 
-type drawingYAxis struct {
-	size      int
-	stats     *data.Stats
-	labelSize int
-}
-
 type XAxisSpanInfo struct {
 	spans     []*graphdata.SpanInfo
 	spanStats *data.Stats

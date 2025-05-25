@@ -73,6 +73,12 @@ func (app *Application) Run(
 	controlCh := make(chan graph.Control)
 	app.addFallbackListener(helpAction(helpCh))
 
+	// TODO make it a command line setting to populate at start
+	control := graph.Presentation{
+		Following:  false,
+		YAxisScale: graph.Linear,
+	}
+
 	// The graph will take ownership of the data channel and data pointer.
 	app.g = graph.NewGraph(
 		ctx,
@@ -82,7 +88,7 @@ func (app *Application) Run(
 			Gui:            app.GUI,
 			PingsPerMinute: *app.config.pingsPerMinute,
 			DrawingBuffer:  app.drawBuffer,
-			InitialControl: graph.Control{}, // TODO make it a command line setting
+			Presentation:   control,
 			ControlPlane:   app.controlPlane,
 			DebugStrict:    *app.config.debugStrict,
 			Data:           existingData,
@@ -94,7 +100,32 @@ func (app *Application) Run(
 		app.makeErrorGenerator()
 	}
 	app.addListener('f', func(rune) error {
-		update := graph.Control{FollowLatestSpan: true}
+		control.Following = !control.Following
+		update := graph.Control{
+			FollowLatestSpan: graph.Change[bool]{
+				DidChange: true,
+				Value:     control.Following,
+			},
+			YAxisScale: graph.Change[graph.YAxisScale]{DidChange: false},
+		}
+		app.controlPlane <- update
+		controlCh <- update
+		return nil
+	})
+	app.addListener('l', func(rune) error {
+		switch control.YAxisScale {
+		case graph.Linear:
+			control.YAxisScale = graph.Logarithmic
+		case graph.Logarithmic:
+			control.YAxisScale = graph.Linear
+		}
+		update := graph.Control{
+			FollowLatestSpan: graph.Change[bool]{DidChange: false},
+			YAxisScale: graph.Change[graph.YAxisScale]{
+				DidChange: true,
+				Value:     control.YAxisScale,
+			},
+		}
 		app.controlPlane <- update
 		controlCh <- update
 		return nil
@@ -136,7 +167,7 @@ func (app *Application) Run(
 	}()
 	go func() {
 		defer termRecover()
-		app.showControls(ctx, controlCh, terminalUpdates[2])
+		app.showControls(ctx, control, controlCh, terminalUpdates[2])
 	}()
 	defer termRecover()
 	exit.OnError(err)

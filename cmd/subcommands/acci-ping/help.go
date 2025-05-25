@@ -86,14 +86,17 @@ func helpStartup() {
 	ctrlCText := themes.Positive("ctrl+c")
 	keyBindF := themes.Positive("f")
 	keyBindH := themes.Positive("h")
+	keyBindL := themes.Positive("l")
 
 	helpCopy = []gui.Typography{
 		{ToPrint: helpText, TextLen: 4, Alignment: gui.Centre},
 		{ToPrint: "", TextLen: 0, Alignment: gui.Centre},
 		{ToPrint: themes.Primary("Press ") + ctrlCText + themes.Primary(" to exit."),
 			TextLen: 6 + 6 + 9, Alignment: gui.Left},
-		{ToPrint: themes.Primary("Press ") + keyBindF + themes.Primary(" to follow the most recent data."),
-			TextLen: 6 + 1 + 32, Alignment: gui.Left},
+		{ToPrint: themes.Primary("Press ") + keyBindF + themes.Primary(" to follow/unfollow the most recent data."),
+			TextLen: 6 + 1 + 41, Alignment: gui.Left},
+		{ToPrint: themes.Primary("Press ") + keyBindL + themes.Primary(" to switch to between log and linear y-axis."),
+			TextLen: 6 + 1 + 44, Alignment: gui.Left},
 		{ToPrint: themes.Primary("Press ") + keyBindH + themes.Primary(" to open/close this window."),
 			TextLen: 6 + 1 + 27, Alignment: gui.Left},
 	}

@@ -19,11 +19,12 @@ import (
 // showControls which should only be called once the paint buffer is initialised.
 func (app *Application) showControls(
 	ctx context.Context,
-	controls <-chan graph.Control,
+	initialValues graph.Presentation,
+	fromTerminal <-chan graph.Control,
 	terminalSizeUpdates <-chan terminal.Size,
 ) {
 	buffer := app.drawBuffer.Get(draw.ControlIndex)
-	c := controlState{following: false} // TODO when added to config populate it here too
+	c := controlState{Presentation: initialValues}
 	app.paint(c.render(app.term.GetSize(), buffer))
 	for {
 		select {
@@ -31,9 +32,12 @@ func (app *Application) showControls(
 			return
 		case newSize := <-terminalSizeUpdates:
 			app.paint(c.render(newSize, buffer))
-		case update := <-controls:
-			if update.FollowLatestSpan {
-				c.following = !c.following
+		case update := <-fromTerminal:
+			if update.FollowLatestSpan.DidChange {
+				c.Following = update.FollowLatestSpan.Value
+			}
+			if update.YAxisScale.DidChange {
+				c.YAxisScale = update.YAxisScale.Value
 			}
 			app.paint(c.render(app.term.GetSize(), buffer))
 		}
@@ -41,34 +45,65 @@ func (app *Application) showControls(
 }
 
 type controlState struct {
-	following bool
+	graph.Presentation
 }
 
 func (c controlState) render(size terminal.Size, buf *bytes.Buffer) paintUpdate {
 	ret := None
 	buf.Reset()
-	if !c.following {
+	if !c.Following || c.YAxisScale != graph.Logarithmic {
 		ret = ret | Invalidate
 	}
-	if c.following {
-		box := c.makeControlBox()
+	paint := false
+	var box gui.Box
+	switch {
+	case c.Following && c.YAxisScale == graph.Logarithmic:
+		box = c.makeFollowingAndLogarithmicBox()
+		paint = true
+	case c.Following:
+		box = c.makeFollowingBox()
+		paint = true
+	case c.YAxisScale == graph.Logarithmic:
+		box = c.makeLogarithmicBox()
+		paint = true
+	}
+	if paint {
 		box.Draw(size, buf)
 		return ret | Paint
 	}
 	return ret
 }
 
-func (c controlState) makeControlBox() gui.Box {
+var (
+	following = gui.Typography{
+		ToPrint:        "Following",
+		LenFromToPrint: true,
+		Alignment:      gui.Right,
+	}
+	logarithmic = gui.Typography{
+		ToPrint:        "Logarithmic",
+		LenFromToPrint: true,
+		Alignment:      gui.Right,
+	}
+)
+
+func (c controlState) makeFollowingAndLogarithmicBox() gui.Box {
+	return makeControlBox(following, logarithmic)
+}
+func (c controlState) makeFollowingBox() gui.Box {
+	return makeControlBox(following)
+}
+func (c controlState) makeLogarithmicBox() gui.Box {
+	return makeControlBox(logarithmic)
+}
+
+func makeControlBox(ts ...gui.Typography) gui.Box {
 	return gui.Box{
-		BoxText: []gui.Typography{{
-			ToPrint:        "Following",
-			LenFromToPrint: true,
-			Alignment:      gui.Right,
-		}},
+		BoxText: ts,
 		Position: gui.Position{
 			Vertical:   gui.Top,
 			Horizontal: gui.Right,
-			Padding:    gui.Padding{Bottom: 1},
+			Padding:    gui.Padding{Left: 1},
 		},
 		Style: gui.NoBorder,
 	}

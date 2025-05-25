@@ -43,17 +43,29 @@ type Graph struct {
 
 	drawingBuffer *draw.Buffer
 
-	currentControl *controlState
-	controlPlane   <-chan Control
+	presentation   *controlState
+	controlChannel <-chan Control
 }
 
+// Control is the signal type which changes the presentation of the graph.
 type Control struct {
-	FollowLatestSpan bool
+	FollowLatestSpan Change[bool]
+	YAxisScale       Change[YAxisScale]
 }
 
-type controlState struct {
-	Control
-	m *sync.Mutex
+type Change[T any] struct {
+	DidChange bool
+	Value     T
+}
+
+// Presentation is the dynamic part of the graph, these only change the presentation of the graph when drawn
+// to the terminal.
+//
+//   - Following if true will make it so that the latest span is the only one drawn as if it is the main graph.
+//   - Y Axis scale sets the y axis scale according to that enum.
+type Presentation struct {
+	Following  bool
+	YAxisScale YAxisScale
 }
 
 type GraphConfiguration struct {
@@ -68,7 +80,7 @@ type GraphConfiguration struct {
 	PingsPerMinute float64
 	URL            string
 	DrawingBuffer  *draw.Buffer
-	InitialControl Control
+	Presentation   Presentation
 	ControlPlane   <-chan Control
 	DebugStrict    bool
 
@@ -100,8 +112,8 @@ func NewGraph(ctx context.Context, cfg GraphConfiguration) *Graph {
 		drawingBuffer:  cfg.DrawingBuffer,
 		ui:             cfg.Gui,
 		debugStrict:    cfg.DebugStrict,
-		controlPlane:   cfg.ControlPlane,
-		currentControl: &controlState{Control: cfg.InitialControl, m: &sync.Mutex{}},
+		controlChannel: cfg.ControlPlane,
+		presentation:   &controlState{Presentation: cfg.Presentation, m: &sync.Mutex{}},
 	}
 	if ctx != nil {
 		// A nil context is valid: It means that no new data is expected and the input channel isn't active
@@ -152,9 +164,14 @@ func (g *Graph) Run(
 					terminalUpdates <- size
 					size = g.Term.GetSize()
 				}
-				g.currentControl.m.Lock()
-				toWrite := g.computeFrame(timeBetweenFrames, g.currentControl.FollowLatestSpan, true)
-				g.currentControl.m.Unlock()
+				g.presentation.m.Lock()
+				toWrite := g.computeFrame(computeFrameConfig{
+					timeBetweenFrames: timeBetweenFrames,
+					followLatestSpan:  g.presentation.Following,
+					drawSpinner:       true,
+					yAxisScale:        g.presentation.YAxisScale,
+				})
+				g.presentation.m.Unlock()
 				err = toWrite(g.Term)
 				if err != nil {
 					return err
@@ -162,7 +179,7 @@ func (g *Graph) Run(
 			}
 		}
 	}
-	if g.controlPlane != nil {
+	if g.controlChannel != nil {
 		go g.handleControl(ctx)
 	}
 	return graph, cleanup, terminalUpdates, err
@@ -176,7 +193,13 @@ func (g *Graph) OneFrame() error {
 	if err := g.Term.UpdateSize(); err != nil {
 		return err
 	}
-	toWrite := g.computeFrame(0, g.currentControl.FollowLatestSpan, false)
+	g.presentation.m.Lock()
+	toWrite := g.computeFrame(computeFrameConfig{
+		followLatestSpan: g.presentation.Following,
+		drawSpinner:      false,
+		yAxisScale:       g.presentation.YAxisScale,
+	})
+	g.presentation.m.Unlock()
 	return toWrite(g.Term)
 }
 
@@ -220,18 +243,27 @@ func (g *Graph) handleControl(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case p, ok := <-g.controlPlane:
+		case p, ok := <-g.controlChannel:
 			if !ok {
 				return
 			}
 			// Note we don't need the mutex while reading the values.
-			if p.FollowLatestSpan {
+			changed := p.FollowLatestSpan.DidChange || p.YAxisScale.DidChange
+			if changed {
 				// But we do need it while writing
-				g.currentControl.m.Lock()
-				g.currentControl.FollowLatestSpan = !g.currentControl.FollowLatestSpan
-				g.currentControl.m.Unlock()
+				g.presentation.m.Lock()
 			}
-			slog.Debug("switching to:", "FollowLatestSpan", g.currentControl.FollowLatestSpan)
+			if p.FollowLatestSpan.DidChange {
+				g.presentation.Following = p.FollowLatestSpan.Value
+				slog.Debug("switching to:", "FollowLatestSpan", p.FollowLatestSpan.Value)
+			}
+			if p.YAxisScale.DidChange {
+				g.presentation.YAxisScale = p.YAxisScale.Value
+				slog.Debug("switching to:", "YAxisScale", p.YAxisScale.Value)
+			}
+			if changed {
+				g.presentation.m.Unlock()
+			}
 		}
 	}
 }
@@ -261,4 +293,9 @@ func (f frame) Match(s terminal.Size, followLatestSpan bool) bool {
 
 func (f frame) Size() terminal.Size {
 	return terminal.Size{Height: f.xAxis.size, Width: f.yAxis.size}
+}
+
+type controlState struct {
+	Presentation
+	m *sync.Mutex
 }

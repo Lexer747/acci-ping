@@ -2,7 +2,7 @@
 
 `acci-ping` is an in terminal ping CLI utility.
 
-[![thumbnail-gif](./images/thumbnail-converted.gif)]()
+[![thumbnail-gif](./images/1.0.2/1-0-2-thumbnail-converted.gif)]()
 
 ## Documentation
 
@@ -93,7 +93,7 @@ go!
 
 This should just work! Download the binaries from https://github.com/Lexer747/acci-ping/releases
 
-![](images/WindowsTerminal_vaip1qU25v.png)
+![](images/old/WindowsTerminal_vaip1qU25v.png)
 
 TODO adding releases to winget, etc
 </details>

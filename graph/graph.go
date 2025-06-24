@@ -213,11 +213,11 @@ func (g *Graph) LastFrame() string {
 	return b.String()
 }
 
-// Summarise will summarise the graph's backed data according to the [*graphdata.GraphData.String] function.
+// Summarise will summarise the graph's backed data according to the [*graphdata.GraphData.Summary] function.
 func (g *Graph) Summarise() string {
 	g.frameMutex.Lock()
 	defer g.frameMutex.Unlock()
-	return strings.ReplaceAll(g.data.String(), "| ", "\n\t")
+	return strings.ReplaceAll(g.data.Summary(), "| ", "\n\t")
 }
 
 func (g *Graph) sink(ctx context.Context) {

@@ -2,7 +2,7 @@
 
 If you want `acci-ping` to use custom colours or just want to tweak the defaults this is the place for you.
 Themes in `acci-ping` are defined by a simple json schema and can be loaded on application start up with the
-`--theme [file]` argument.
+`--theme [file]` argument. Note: `acci-ping` does not set a background colour and always uses the current colour.
 
 Here is an example:
 

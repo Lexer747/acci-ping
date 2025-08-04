@@ -23,7 +23,8 @@ import (
 	"github.com/Lexer747/acci-ping/utils/exit"
 )
 
-// these looking more bash variables helps clue me into where these actually come from which is build time linking, see tools/build.sh.
+// these looking more bash variables helps clue me into where these
+// actually come from which is build time linking, see tools/build.sh.
 //
 //nolint:staticcheck
 var (

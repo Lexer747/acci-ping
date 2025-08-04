@@ -104,6 +104,10 @@ func (d *Data) String() string {
 	return fmt.Sprintf("%s: PingsMeta#%d [%s] | %s | %s", d.URL, d.PingsMeta, d.Network.String(), d.Header.String(), d.Runs.String())
 }
 
+func (d *Data) Summary() string {
+	return fmt.Sprintf("%s: PingsMeta#%d [%s] | %s | %s", d.URL, d.PingsMeta, d.Network.String(), d.Header.Summary(), d.Runs.String())
+}
+
 func (d *Data) In(tz *time.Location) *Data {
 	ret := newVersionedData(d.URL, d.PingsMeta)
 	for i := range d.TotalCount {
@@ -234,6 +238,12 @@ func (h *Header) AddPoint(p ping.PingDataPoint) {
 func (h *Header) String() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s | %s", h.TimeSpan.String(), h.Stats.String())
+	return b.String()
+}
+
+func (h *Header) Summary() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s | %s", h.TimeSpan.String(), h.Stats.PickString(math.MaxInt))
 	return b.String()
 }
 

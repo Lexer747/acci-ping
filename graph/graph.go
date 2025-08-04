@@ -151,6 +151,7 @@ func (g *Graph) Run(
 	graph := func() error {
 		size := g.Term.GetSize()
 		defer close(terminalUpdates)
+		slog.Debug("running acci-ping")
 		for {
 			select {
 			case <-ctx.Done():
@@ -213,11 +214,11 @@ func (g *Graph) LastFrame() string {
 	return b.String()
 }
 
-// Summarise will summarise the graph's backed data according to the [*graphdata.GraphData.String] function.
+// Summarise will summarise the graph's backed data according to the [*graphdata.GraphData.Summary] function.
 func (g *Graph) Summarise() string {
 	g.frameMutex.Lock()
 	defer g.frameMutex.Unlock()
-	return strings.ReplaceAll(g.data.String(), "| ", "\n\t")
+	return strings.ReplaceAll(g.data.Summary(), "| ", "\n\t")
 }
 
 func (g *Graph) sink(ctx context.Context) {
@@ -228,7 +229,7 @@ func (g *Graph) sink(ctx context.Context) {
 			return
 		case p, ok := <-g.dataChannel:
 			// TODO configure logging channels
-			// slog.Debug("graph sink data received", "packet", p)
+			slog.Debug("graph sink, data received", "packet", p)
 			if !ok {
 				g.sinkAlive = false
 				return

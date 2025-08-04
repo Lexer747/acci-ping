@@ -8,8 +8,10 @@ package ping
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -63,7 +65,10 @@ func (q *queryCache) socketed(addrType addressType) {
 func (q *queryCache) GetLastIP() string {
 	q.m.Lock()
 	defer q.m.Unlock()
-	return q.store[q.index].addr.String()
+	if len(q.store) > 0 {
+		return q.store[q.index].addr.String()
+	}
+	return "<no ip>"
 }
 
 // Get will return an IP for use which is not considered stale and true. If the cache is exhausted an all IPs
@@ -71,18 +76,17 @@ func (q *queryCache) GetLastIP() string {
 func (q *queryCache) Get() (*addr, bool) {
 	q.m.Lock()
 	defer q.m.Unlock()
-	// If there's only one IP to pick from then we can do a more simple lookup.
-	if len(q.store) == 1 {
-		if !q.store[0].stale {
-			return q.store[0].addr, true
-		}
-		return nil, false
-	}
-	// We must iterate the cache, returning the first IP which isn't stale.
-	for start := q.index; start != q.index; q.advance() {
-		r := q.store[q.index]
-		if !r.stale {
+	// iterate the cache, returning the first IP which isn't stale.
+	start := q.index
+	for {
+		if r := q.store[q.index]; !r.stale {
 			return r.addr, true
+		}
+		// this index was stale, advance the internal index.
+		q.advance()
+		// exit the loop if we went back to the start
+		if q.index == start {
+			break
 		}
 	}
 	// No non-stale IPs found
@@ -121,13 +125,26 @@ type queryCacheItem struct {
 	dropCount uint
 }
 
+func (qci queryCacheItem) String() string {
+	var b strings.Builder
+	b.WriteString("[" + qci.addr.String())
+	if qci.stale {
+		b.WriteString(", stale")
+	} else {
+		b.WriteString(", fresh")
+	}
+	fmt.Fprintf(&b, ", %d]", qci.dropCount)
+	return b.String()
+}
+
 // _DNSQuery builds a new [ping.queryCache] for a given URL. If no valid addresses are found then an error is
 // returned. The max drops specifies to the cache how many dropped packets an address is allowed before we
 // consider that address too un-reliable, services may rotate their addresses in which case this cache will
 // clear itself of these now defunct addresses. If maxDrops is 0, then only a single dropped packet will mean
 // the address is considered stale.
-func _DNSQuery(url string, addrType addressType, maxDrops uint) (*queryCache, error) {
-	ips, err := net.LookupIP(url)
+func _DNSQuery(ctx context.Context, url string, addrType addressType, maxDrops uint) (*queryCache, error) {
+	resolver := &net.Resolver{}
+	ips, err := resolver.LookupIP(ctx, "ip", url)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't get IP for %q (DNS failure)", url)
 	}
@@ -183,7 +200,9 @@ HARD_RETRY:
 		// Keeping doing a DNS query until we get a valid result, count each failure as a dropped packet
 		for p.addresses == nil {
 			// start again, do a new DNS query
-			p.addresses, err = _DNSQuery(url, _UNRESOLVED, p.dnsCacheTrust)
+			dnsTimeout, cancel := context.WithTimeout(ctx, p.timeout)
+			defer cancel()
+			p.addresses, err = _DNSQuery(dnsTimeout, url, _UNRESOLVED, p.dnsCacheTrust)
 			if err != nil {
 				client <- packetLoss(nil, timestamp, DNSFailure)
 				<-rateLimit.C

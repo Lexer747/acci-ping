@@ -28,7 +28,7 @@ func GetFlags() *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
 	ret := &Config{
 		FlagSet:  f,
-		printAll: f.Bool("all", true, "prints all raw values otherwise only summarises '.pings' files"),
+		printAll: f.Bool("all", false, "prints all raw values otherwise only summarises '.pings' files"),
 		toCSV:    f.Bool("csv", false, "writes '.pings' files as '.csv'"),
 	}
 
@@ -79,7 +79,7 @@ func handle(printAll, toCSV bool, d *data.Data) {
 	case toCSV:
 		handleCSV(d)
 	default:
-		fmt.Fprintln(os.Stdout, d.String())
+		fmt.Fprintln(os.Stdout, d.Summary())
 	}
 }
 

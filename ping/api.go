@@ -73,8 +73,11 @@ func (p *Ping) OneShot(url string) (time.Duration, error) {
 		return 0, err
 	}
 
+	dnsTimeout, cancel := context.WithTimeoutCause(context.Background(), time.Second, pingTimeout{Duration: 100 * time.Millisecond})
+	defer cancel()
+
 	// Now find the IP address we will actually ping to
-	cache, err := _DNSQuery(url, p.addrType, p.dnsCacheTrust)
+	cache, err := _DNSQuery(dnsTimeout, url, p.addrType, p.dnsCacheTrust)
 	if err != nil {
 		return 0, err
 	}
@@ -124,9 +127,12 @@ func (p *Ping) CreateChannel(ctx context.Context, url string, pingsPerMinute flo
 		return nil, err
 	}
 
-	// Block the main thread to init this for the first time (most consumers will want to have a [GetLastIP]
-	// value as soon as this method returns), if we get an error let the main loop do the retying.
-	p.addresses, _ = _DNSQuery(url, p.addrType, p.dnsCacheTrust)
+	dnsTimeout, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	// Block the main thread to init this for the first time (most consumers will want to have a
+	// [queryCache.GetLastIP] value as soon as this method returns), if we get an error let the main loop do
+	// the retying.
+	p.addresses, _ = _DNSQuery(dnsTimeout, url, p.addrType, p.dnsCacheTrust)
 
 	rateLimit := p.buildRateLimiting(pingsPerMinute)
 
@@ -143,7 +149,7 @@ type PingResults struct {
 	IP net.IP
 	// InternalErr represents some problem with [ping] package internal state which didn't gracefully handle
 	// some network problem. Other network problems which are expected and represent dropped packets **should
-	// be** handled gracefully and will be reported in the [PingDataPoint] felid in the [Dropped].
+	// be** handled gracefully and will be reported in the [PingDataPoint] field in the [Dropped].
 	InternalErr error
 }
 

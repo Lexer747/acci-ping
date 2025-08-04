@@ -66,7 +66,7 @@ func (p *Ping) startChannel(ctx context.Context, client chan<- PingResults, clos
 }
 
 func (p *Ping) buildRateLimiting(pingsPerMinute float64) *time.Ticker {
-	p.timeout = time.Second
+	p.timeout = 500 * time.Millisecond
 	var rateLimit *time.Ticker
 	// Zero is the sentinel, go as fast as possible
 	if pingsPerMinute != 0 {

@@ -24,7 +24,7 @@ func TestOneShot_google_com(t *testing.T) {
 	p := ping.NewPing()
 	duration, err := p.OneShot("www.google.com")
 	assert.NilError(t, err)
-	assert.Assert(t, cmp.Compare(duration, time.Millisecond) >= 0)
+	assert.Assert(t, cmp.Compare(duration, time.Millisecond) > 0)
 }
 
 func TestChannel_google_com(t *testing.T) {
@@ -34,11 +34,13 @@ func TestChannel_google_com(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(t.Context())
 	_, err := p.CreateChannel(ctx, "www.google.com", -1, 0)
 	assert.Assert(t, is.ErrorContains(err, "Invalid pings per minute"))
-	channel, err := p.CreateChannel(ctx, "www.google.com", 0, 0)
+	const testSize = 5
+	channel, err := p.CreateChannel(ctx, "www.google.com", 0, testSize)
 	assert.NilError(t, err)
-	for range 2 {
+	for range testSize {
 		result := <-channel
-		assert.Assert(t, cmp.Compare(result.Data.Duration, time.Millisecond) >= 0)
+		assert.Check(t, !result.Data.Dropped(), result.Data.String())
+		assert.Assert(t, cmp.Compare(result.Data.Duration, time.Millisecond) > 0)
 	}
 	cancelFunc()
 }

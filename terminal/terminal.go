@@ -68,6 +68,7 @@ type Terminal struct {
 
 	isTestTerminal bool
 	isDynamicSize  bool
+	neverRaw       bool
 
 	backgroundColour     themes.Luminance
 	backgroundDiscovered backgroundDiscovered
@@ -131,17 +132,39 @@ func NewFixedSizeTerminal(s Size) (*Terminal, error) {
 	return t, nil
 }
 
+func NewDebuggingTerminal(s Size) (*Terminal, error) {
+	t := &Terminal{
+		size:          s,
+		listeners:     []ConditionalListener{},
+		fallbacks:     []Listener{},
+		stdin:         os.Stdin,
+		stdout:        os.Stdout,
+		listenMutex:   &sync.Mutex{},
+		isDynamicSize: false,
+		neverRaw:      true,
+	}
+	return t, nil
+}
+
 // NewParsedFixedSizeTerminal will construct a new fixed size terminal which cannot change size, parsing the
 // size from the input parameter string, which is in format <H>x<W>, where H and W are integers.
 func NewParsedFixedSizeTerminal(size string) (*Terminal, error) {
+	s, err := NewSize(size)
+	if err != nil {
+		return nil, err
+	}
+	return NewFixedSizeTerminal(s)
+}
+
+func NewSize(size string) (Size, error) {
 	s, ok := ParseSize(size)
 	if !ok {
-		return nil, errors.Errorf(
+		return Size{}, errors.Errorf(
 			"Cannot parse %q as terminal a size, should be in the form \"<H>x<W>\", where H and W are integers.",
 			size,
 		)
 	}
-	return NewFixedSizeTerminal(s)
+	return s, nil
 }
 
 // NewTestTerminal builds a terminal in which no real file interactions occur by default, instead all normal
@@ -231,6 +254,9 @@ func (t *Terminal) StartRaw(
 	fallbacks []Listener,
 ) (func(), error) {
 	restore := func() {}
+	if t.neverRaw {
+		return restore, nil
+	}
 	if !t.isTestTerminal {
 		oldState, err := term.MakeRaw(t.stdinFd)
 		if err != nil {

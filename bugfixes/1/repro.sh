@@ -14,6 +14,6 @@ relative=$(dirname "${BASH_SOURCE[0]}")
 
 # This ugly continuous gap of gradient is bad.
 
-acci-ping drawframe --theme no -term-size "10x120" "${relative}/looks-bad.pings"
+"$ROOT/out/linux/amd64/acci-ping-linux-amd64" drawframe --theme no -term-size "10x120" "${relative}/looks-bad.pings"
 
 

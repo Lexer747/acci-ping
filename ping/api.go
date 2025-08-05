@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/Lexer747/acci-ping/utils/errors"
@@ -29,14 +30,10 @@ type Ping struct {
 
 	echoType, echoReply icmp.Type
 
-	dnsCacheTrust uint
-	addresses     *queryCache
+	addresses *queryCache
 }
 
 func (p *Ping) LastIP() string {
-	if p.addresses == nil {
-		return "<IP NOT YET FOUND>"
-	}
 	return p.addresses.GetLastIP()
 }
 
@@ -58,7 +55,10 @@ func NewPing() *Ping {
 	b := [2]byte{}
 	_, _ = rand.Read(b[:]) // Read from rand never returns an error
 	seed := binary.LittleEndian.Uint16(b[:])
-	return &Ping{id: seed}
+	return &Ping{
+		id:        seed,
+		addresses: &queryCache{m: &sync.Mutex{}, maxDrops: 3},
+	}
 }
 
 // OneShot returns the time take for a ping to be replied too, or error if something went wrong.
@@ -77,12 +77,12 @@ func (p *Ping) OneShot(url string) (time.Duration, error) {
 	defer cancel()
 
 	// Now find the IP address we will actually ping to
-	cache, err := _DNSQuery(dnsTimeout, url, p.addrType, p.dnsCacheTrust)
+	err = p.addresses._DNSQuery(dnsTimeout, url, p.addrType)
 	if err != nil {
 		return 0, err
 	}
 	// Don't handle this [!ok] case in OneShot
-	selectedIP, _ := cache.Get()
+	selectedIP, _ := p.addresses.Get()
 
 	raw, err := p.makeOutgoingPacket(1)
 	if err != nil {
@@ -127,14 +127,16 @@ func (p *Ping) CreateChannel(ctx context.Context, url string, pingsPerMinute flo
 		return nil, err
 	}
 
+	rateLimit := p.buildRateLimiting(pingsPerMinute)
+
 	dnsTimeout, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
 	// Block the main thread to init this for the first time (most consumers will want to have a
 	// [queryCache.GetLastIP] value as soon as this method returns), if we get an error let the main loop do
 	// the retying.
-	p.addresses, _ = _DNSQuery(dnsTimeout, url, p.addrType, p.dnsCacheTrust)
-
-	rateLimit := p.buildRateLimiting(pingsPerMinute)
+	p.addresses.m.Lock()
+	_ = p.addresses._DNSQuery(dnsTimeout, url, p.addrType)
+	p.addresses.m.Unlock()
 
 	client := make(chan PingResults, channelSize)
 	p.startChannel(ctx, client, closer, url, rateLimit)

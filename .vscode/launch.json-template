@@ -1,0 +1,144 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run: acci-ping",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "-debug-error-creator",
+                "-l",
+                "debugging-dev.log",
+                "-hide-help",
+                "-file",
+                "debugging-dev.pings",
+                "-cpuprofile",
+                "cpu.prof",
+                "-memprofile",
+                "mem.prof",
+                "-debug-strict",
+                "-debugging-term-size",
+                "20x20"
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Run: acci-ping ping",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "ping",
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Run: drawframe follow",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "drawframe",
+                "-term-size",
+                "26x128",
+                "-debug-strict",
+                "-debug-follow",
+                "${workspaceFolder}/dev.pings",
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Run: drawframe -log-scale",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "drawframe",
+                "-term-size",
+                "26x128",
+                "-debug-strict",
+                "-log-scale",
+                "${workspaceFolder}/graph/data/testdata/input/large-hotel.pings",
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Run: bugfixes/2",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "drawframe",
+                "-term-size",
+                "1x58",
+                "-debug-strict",
+                "${workspaceFolder}/bugfixes/2/panic.pings",
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Run: bugfixes/3",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "drawframe",
+                "-term-size",
+                "26x128",
+                "-debug-strict",
+                "${workspaceFolder}/bugfixes/3/panic.pings",
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Run: bugfixes/4",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "drawframe",
+                "--theme",
+                "no",
+                "-term-size",
+                "24x138",
+                "-log-scale",
+                "-debug-follow",
+                "-debug-strict",
+                "${workspaceFolder}/bugfixes/4/panic.pings",
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Run: bugfixes/5",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "drawframe",
+                "--theme",
+                "no",
+                "-term-size",
+                "24x138",
+                "-log-scale",
+                "-debug-follow",
+                "-debug-strict",
+                "${workspaceFolder}/bugfixes/5/panic.pings",
+            ],
+            "program": "${workspaceFolder}"
+        },
+        {
+            "name": "Test: Rapid Debug",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "args": [
+                "${file}"
+            ],
+            "program": "test"
+        },
+    ]
+}

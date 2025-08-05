@@ -13,11 +13,12 @@
 ## Dont track user settings but allow project wide settings
 .vscode
 !.vscode/settings.json
+!.vscode/launch.json-template
 ## Ignore go debug builds
 __debug_bin**
 
 ## Ignore AcciPing dev files:
-dev.pings
+*dev.pings
 *.log
 *.logs
 

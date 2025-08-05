@@ -40,7 +40,7 @@ var expectedBGOutput = []byte(ansi.OSC + "11;rgb:RRRR/GGGG/BBBB<-----padding----
 // [ctlseqs]: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
 // [OSC]: https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands
 func (t *Terminal) tryGetBackgroundColour() bool {
-	if t.isTestTerminal || !t.isDynamicSize {
+	if t.isTestTerminal || !t.isDynamicSize || t.neverRaw {
 		return false
 	}
 	// First put the terminal in raw mode, this is needed so that we can intercept the output of the query

@@ -47,10 +47,11 @@ func (p *Ping) startChannel(ctx context.Context, client chan<- PingResults, clos
 				timestamp = time.Now()
 			}
 
-			if seq, errorDuringLoop = p.pingOnChannel(ctx, timestamp, ip, seq, client, buffer); errorDuringLoop {
+			if errorDuringLoop = p.pingOnChannel(ctx, timestamp, ip, seq, client, buffer); errorDuringLoop {
 				// Keep track of this address as maybe being unreliable
 				p.addresses.Dropped(ip)
 			}
+			seq++ // Deliberate wrap-around
 			select {
 			case <-ctx.Done():
 				return
@@ -116,47 +117,50 @@ func (p *Ping) pingOnChannel(
 	seq uint16,
 	client chan<- PingResults,
 	buffer []byte,
-) (uint16, bool) {
+) bool {
 	// Can gain some speed here by not remaking this each time, only to change the sequence number.
 	raw, err := p.makeOutgoingPacket(seq)
 	if err != nil {
 		client <- internalErr(selected.ip, timestamp, err)
-		return seq, true
+		return true
 	}
 
 	// Actually write the echo request onto the connection:
 	if err = p.writeEcho(selected, raw); err != nil {
 		client <- internalErr(selected.ip, timestamp, err)
-		return seq, true
+		return true
 	}
 	begin := time.Now()
-	timeout := pingTimeout{Duration: p.timeout}
-	timeoutCtx, cancel := context.WithTimeoutCause(ctx, p.timeout, timeout)
+	timeoutErr := pingTimeout{Duration: p.timeout}
+	timeoutCtx, cancel := context.WithTimeoutCause(ctx, p.timeout, timeoutErr)
 	defer cancel()
 	n, err := p.pingRead(timeoutCtx, buffer)
 	duration := time.Since(begin)
-	if err != nil && errors.Is(err, timeout) {
+	if err != nil && errors.Is(err, timeoutErr) {
 		client <- packetLoss(selected.ip, timestamp, Timeout)
-		return seq, true
+		return true
 	} else if err != nil {
 		client <- internalErr(selected.ip, timestamp, errors.Wrapf(err, "couldn't read packet from %q", p.currentURL))
-		return seq, true
+		return true
 	}
 	received, err := icmp.ParseMessage(protocolICMP, buffer[:n])
 	if err != nil {
 		client <- internalErr(selected.ip, timestamp, errors.Wrapf(err, "couldn't parse raw packet from %q, %+v", p.currentURL, received))
-		return seq, true
+		return true
 	}
-	seq++ // Deliberate wrap-around
-	switch received.Type {
-	case p.echoReply:
-		// Clear the buffer for next packet
-		bytes.Clear(buffer, n)
+	body, ok := received.Body.(*icmp.Echo)
+	if !ok {
+		client <- internalErr(selected.ip, timestamp, errors.Wrapf(err, "couldn't parse body from %q, %+v", p.currentURL, received))
+		return true
+	}
+	// Clear the buffer for next packet
+	defer bytes.Clear(buffer, n)
+	if body.Seq == int(seq) && received.Type == p.echoReply {
 		client <- goodPacket(selected.ip, duration, timestamp)
-		return seq, false
-	default:
+		return false
+	} else {
 		client <- packetLoss(selected.ip, timestamp, BadResponse)
-		return seq, true
+		return true
 	}
 }
 

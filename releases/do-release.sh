@@ -44,3 +44,5 @@ git commit -m "New release $VERSION"
 git tag -a "$VERSION" -m "Tagged automatically by do-release.sh at $TIMESTAMP"
 
 "$TOOLS_DIR"/build.sh sign
+
+cp "$ROOT/out/linux/amd64/acci-ping-linux-amd64" "$HOME/go/bin/acci-ping"

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Lexer747/acci-ping/utils/backoff"
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/errors"
 )
@@ -32,6 +33,8 @@ type queryCache struct {
 }
 
 func (q *queryCache) socketed(addrType addressType) {
+	q.m.Lock()
+	defer q.m.Unlock()
 	check.Check(addrType != _UNRESOLVED, "cannot socket query cache to _UNRESOLVED")
 
 	results := make([]queryCacheItem, 0, len(q.store))
@@ -76,6 +79,15 @@ func (q *queryCache) GetLastIP() string {
 func (q *queryCache) Get() (*addr, bool) {
 	q.m.Lock()
 	defer q.m.Unlock()
+	return q.getLockFree()
+}
+
+func (q *queryCache) getLockFree() (*addr, bool) {
+	if len(q.store) == 0 {
+		// store is empty
+		return nil, false
+	}
+
 	// iterate the cache, returning the first IP which isn't stale.
 	start := q.index
 	for {
@@ -142,14 +154,15 @@ func (qci queryCacheItem) String() string {
 // consider that address too un-reliable, services may rotate their addresses in which case this cache will
 // clear itself of these now defunct addresses. If maxDrops is 0, then only a single dropped packet will mean
 // the address is considered stale.
-func _DNSQuery(ctx context.Context, url string, addrType addressType, maxDrops uint) (*queryCache, error) {
+func (q *queryCache) _DNSQuery(ctx context.Context, url string, addrType addressType) error {
+	// This doesn't need a lock because it should only be called by things already holding the lock
 	resolver := &net.Resolver{}
 	ips, err := resolver.LookupIP(ctx, "ip", url)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't get IP for %q (DNS failure)", url)
+		return errors.Wrapf(err, "couldn't get IP for %q (DNS failure)", url)
 	}
 	if len(ips) == 0 {
-		return nil, errors.Errorf("Couldn't resolve %q to any address. Network down? (DNS failure)", url)
+		return errors.Errorf("Couldn't resolve %q to any address. Network down? (DNS failure)", url)
 	}
 
 	// Only use IPs which are of the socket type we're actually operating under. If unresolved we forward all IPs as successful.
@@ -171,13 +184,10 @@ func _DNSQuery(ctx context.Context, url string, addrType addressType, maxDrops u
 		}
 	}
 	if len(results) == 0 {
-		return nil, errors.Errorf("Couldn't resolve %q to a valid IP address (DNS failure)", url)
+		return errors.Errorf("Couldn't resolve %q to a valid IP address (DNS failure)", url)
 	}
-	return &queryCache{
-		m:        &sync.Mutex{},
-		store:    results,
-		maxDrops: maxDrops,
-	}, nil
+	q.store = results
+	return nil
 }
 
 func (p *Ping) dnsRetry(
@@ -188,48 +198,63 @@ func (p *Ping) dnsRetry(
 	rateLimit *time.Ticker,
 	closer func(),
 ) (*addr, func()) {
+	p.addresses.m.Lock()
+	defer p.addresses.m.Unlock()
+	// fast path, just get the ip from the cache if it exists
+	if ip, ok := p.addresses.getLockFree(); ok {
+		return ip, nil
+	}
+
 	var err error
 	var newCloser func()
+	exp := backoff.NewExponentialBackoff(p.timeout)
 	// I know that a goto and label looks scary but I assure you dear reader that this is sane, since our
 	// control flow and error handling path implies an infinite loop (Because we need to try listening for
 	// packets forever unless cancelled by the parent). This infinite loop is coupled to the results of the
 	// DNS query, therefore to truly retry against the network requires a loop around the two inner loops,
 	// which if done with a `for` construct is much less legible.
 HARD_RETRY:
-	if p.addresses == nil {
-		// Keeping doing a DNS query until we get a valid result, count each failure as a dropped packet
-		for p.addresses == nil {
-			// start again, do a new DNS query
-			dnsTimeout, cancel := context.WithTimeout(ctx, p.timeout)
-			defer cancel()
-			p.addresses, err = _DNSQuery(dnsTimeout, url, _UNRESOLVED, p.dnsCacheTrust)
-			if err != nil {
-				client <- packetLoss(nil, timestamp, DNSFailure)
+	// Keeping doing a DNS query until we get a valid result, count each failure as a dropped packet
+	for {
+		// start again, do a new DNS query
+		dnsTimeout, cancel := context.WithTimeout(ctx, exp.Duration())
+		defer cancel()
+		err = p.addresses._DNSQuery(dnsTimeout, url, _UNRESOLVED)
+		if err != nil {
+			exp.Fail()
+			client <- packetLoss(nil, timestamp, DNSFailure)
+			if rateLimit != nil {
 				<-rateLimit.C
-				timestamp = time.Now()
-				p.addresses = nil
 			}
-		}
-		// Reset our listening, it's a chance our NIC died in which case we need to restart this.
-		// I don't think we can tell that the inner listener died.
-		closer()
-		for {
-			newCloser, err = p.startListening(url)
-			if err == nil {
-				p.addresses.socketed(p.addrType)
-				break
-			}
-			// Now is a sane point in the function to determine if the parent wants us to stop spinning our
-			// hamster wheel trying to find a packet. Overly checking this value is wasteful and unhelpful, we
-			// expect the ratelimited loop to do that the majority of the time.
-			if err := ctx.Err(); err != nil {
-				break
-			}
+			timestamp = time.Now()
+			clear(p.addresses.store)
+		} else {
+			exp.Success()
+			break
 		}
 	}
-	ip, ok := p.addresses.Get()
+	// Reset our listening, it's a chance our NIC died in which case we need to restart this. I don't
+	// think we can tell that the inner listener died. Don't use exp back off here, this can only be a
+	// client issue.
+	closer()
+	for {
+		newCloser, err = p.startListening(url)
+		if err == nil {
+			p.addresses.socketed(p.addrType)
+			break
+		}
+		// Now is a sane point in the function to determine if the parent wants us to stop spinning our
+		// hamster wheel trying to find a packet. Overly checking this value is wasteful and unhelpful, we
+		// expect the ratelimited loop to do that the majority of the time.
+		if err := ctx.Err(); err != nil {
+			return nil, nil
+		}
+		goto HARD_RETRY
+	}
+
+	ip, ok := p.addresses.getLockFree()
 	if !ok {
-		p.addresses = nil
+		clear(p.addresses.store)
 		goto HARD_RETRY // Avoid recursion, if we made it here either we have a fresh restart the entire address pool is exhausted
 	}
 	return ip, newCloser

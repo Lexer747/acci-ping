@@ -11,25 +11,38 @@ import (
 	"time"
 )
 
-type expFallOff struct {
-	// Base is the initial smallest duration to wait in milliseconds
-	Base     float64
+type ExpFallOff struct {
+	// base is the initial smallest duration to wait in milliseconds
+	base     float64
 	curCount int
 }
 
 // https://en.wikipedia.org/wiki/Exponential_backoff
-func NewExponentialBackoff(backoffStart time.Duration) *expFallOff {
-	return &expFallOff{
-		Base: float64(backoffStart.Milliseconds()),
+func NewExponentialBackoff(backoffStart time.Duration) *ExpFallOff {
+	return &ExpFallOff{
+		base: float64(backoffStart.Milliseconds()),
 	}
 }
 
-func (e *expFallOff) Wait() {
-	e.curCount++
-	backoff := time.Duration(math.Pow(e.Base, float64(e.curCount)))
-	<-time.After(backoff * time.Millisecond)
+// Wait marks the current backoff as failing and then blocks the current thread the corresponding amount of
+// time.
+func (e *ExpFallOff) Wait() {
+	e.Fail()
+	backoff := e.Duration()
+	<-time.After(backoff)
 }
 
-func (e *expFallOff) Success() {
+// Success resets the current back off back to its initial duration marking the backoff as completed.
+func (e *ExpFallOff) Success() {
 	e.curCount = 0
+}
+
+// Fail marks the exp as failing increasing the next duration it will wait by an exponential amount.
+func (e *ExpFallOff) Fail() {
+	e.curCount++
+}
+
+// Duration returns the time that the backoff **would** wait if failure occurs.
+func (e *ExpFallOff) Duration() time.Duration {
+	return time.Duration(math.Pow(e.base, float64(e.curCount))) * time.Millisecond
 }

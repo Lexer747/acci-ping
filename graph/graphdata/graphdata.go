@@ -121,7 +121,11 @@ const allowedMeanWhenTwoPoints = 7.0
 
 func (si *SpanInfo) addFirstPoint(p ping.PingDataPoint, index int64) {
 	si.TimeSpan = &data.TimeSpan{Begin: p.Timestamp, End: p.Timestamp}
-	si.PingStats.AddPoint(p.Duration)
+	if p.Dropped() {
+		si.PingStats.AddDroppedPacket()
+	} else {
+		si.PingStats.AddPoint(p.Duration)
+	}
 	si.Count++
 	si.LastPoint = p
 	si.start = index
@@ -131,7 +135,11 @@ func (si *SpanInfo) addFirstPoint(p ping.PingDataPoint, index int64) {
 func (si *SpanInfo) add(p ping.PingDataPoint, index int64) {
 	gap := p.Timestamp.Sub(si.LastPoint.Timestamp)
 	si.SpanStats.AddPoint(gap)
-	si.PingStats.AddPoint(p.Duration)
+	if p.Dropped() {
+		si.PingStats.AddDroppedPacket()
+	} else {
+		si.PingStats.AddPoint(p.Duration)
+	}
 	si.TimeSpan.AddTimestamp(p.Timestamp)
 	si.Count++
 	si.LastPoint = p

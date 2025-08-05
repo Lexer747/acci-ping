@@ -186,7 +186,7 @@ func (app *Application) Init(ctx context.Context, c Config) (<-chan ping.PingRes
 	app.GUI = newGUIState()
 	p := ping.NewPing()
 	var err error
-	app.term, err = terminal.NewTerminal()
+	app.term, err = makeTerminal(c.debuggingTermSize)
 	exit.OnError(err) // If we can't open the terminal for any reason we reasonably can't do anything this program offers.
 
 	var existingData *data.Data
@@ -221,7 +221,7 @@ func (app *Application) Finish() {
 
 func (app *Application) writeToFile(ctx context.Context, ourData *data.Data, input <-chan ping.PingResults) {
 	defer app.toUpdate.Close()
-	backoff := backoff.NewExponentialBackoff(500 * time.Millisecond)
+	exp := backoff.NewExponentialBackoff(500 * time.Millisecond)
 	for {
 		select {
 		case <-ctx.Done():
@@ -234,16 +234,16 @@ func (app *Application) writeToFile(ctx context.Context, ourData *data.Data, inp
 			_, err := app.toUpdate.Seek(0, 0)
 			if err != nil {
 				app.errorChannel <- err
-				backoff.Wait()
+				exp.Wait()
 				continue
 			}
 			err = ourData.AsCompact(app.toUpdate)
 			if err != nil {
 				app.errorChannel <- err
-				backoff.Wait()
+				exp.Wait()
 				continue
 			}
-			backoff.Success()
+			exp.Success()
 		}
 	}
 }
@@ -298,4 +298,16 @@ func loadFile(file, url string) (*data.Data, *os.File) {
 	d, f, err := files.LoadOrCreateFile(file, url)
 	exit.OnError(err)
 	return d, f
+}
+
+func makeTerminal(termSize *string) (*terminal.Terminal, error) {
+	if termSize != nil && *termSize != "" {
+		s, err := terminal.NewSize(*termSize)
+		if err != nil {
+			return nil, err
+		}
+		return terminal.NewDebuggingTerminal(s)
+	} else {
+		return terminal.NewTerminal()
+	}
 }

@@ -29,9 +29,10 @@ type Config struct {
 	memprofile         *string
 	pingBufferingLimit *int
 	pingsPerMinute     *float64
+	debuggingTermSize  *string
 	testErrorListener  *bool
-	url                *string
 	theme              *string
+	url                *string
 
 	*application.BuildInfo
 	*flag.FlagSet
@@ -60,7 +61,8 @@ func GetFlags(info *application.BuildInfo) *Config {
 			"There's also the builtin list of themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
 			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
 			" for how to create custom themes."),
-		FlagSet: f,
+		debuggingTermSize: f.String("debugging-term-size", "", "switches the terminal to fixed mode and no iteractivity"),
+		FlagSet:           f,
 	}
 	*ret.pingBufferingLimit = 10
 	return ret

@@ -9,13 +9,13 @@ package ping
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/Lexer747/acci-ping/utils/backoff"
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/errors"
 )
@@ -32,9 +32,7 @@ type queryCache struct {
 	maxDrops uint
 }
 
-func (q *queryCache) socketed(addrType addressType) {
-	q.m.Lock()
-	defer q.m.Unlock()
+func (q *queryCache) socketedLockFree(addrType addressType) {
 	check.Check(addrType != _UNRESOLVED, "cannot socket query cache to _UNRESOLVED")
 
 	results := make([]queryCacheItem, 0, len(q.store))
@@ -155,8 +153,8 @@ func (qci queryCacheItem) String() string {
 // clear itself of these now defunct addresses. If maxDrops is 0, then only a single dropped packet will mean
 // the address is considered stale.
 func (q *queryCache) _DNSQuery(ctx context.Context, url string, addrType addressType) error {
-	// This doesn't need a lock because it should only be called by things already holding the lock
 	resolver := &net.Resolver{}
+	// This doesn't need a lock because it should only be called by things already holding the lock
 	ips, err := resolver.LookupIP(ctx, "ip", url)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't get IP for %q (DNS failure)", url)
@@ -207,7 +205,7 @@ func (p *Ping) dnsRetry(
 
 	var err error
 	var newCloser func()
-	exp := backoff.NewExponentialBackoff(p.timeout)
+	slog.Debug("dns hard retry entry", "url", url, "cause", "p.addresses empty")
 	// I know that a goto and label looks scary but I assure you dear reader that this is sane, since our
 	// control flow and error handling path implies an infinite loop (Because we need to try listening for
 	// packets forever unless cancelled by the parent). This infinite loop is coupled to the results of the
@@ -217,11 +215,14 @@ HARD_RETRY:
 	// Keeping doing a DNS query until we get a valid result, count each failure as a dropped packet
 	for {
 		// start again, do a new DNS query
-		dnsTimeout, cancel := context.WithTimeout(ctx, exp.Duration())
+		timeoutErr := pingTimeout{Duration: p.timeout}
+		// FWIW I don't think this timeout actually makes a difference on most platforms, it seems like OS
+		// controlled Dialer and Resolver Timeouts come into effect before this will. It may also be
+		// https://github.com/golang/go/issues/36848
+		dnsTimeout, cancel := context.WithTimeoutCause(ctx, p.timeout, timeoutErr)
 		defer cancel()
 		err = p.addresses._DNSQuery(dnsTimeout, url, _UNRESOLVED)
 		if err != nil {
-			exp.Fail()
 			client <- packetLoss(nil, timestamp, DNSFailure)
 			if rateLimit != nil {
 				<-rateLimit.C
@@ -229,8 +230,14 @@ HARD_RETRY:
 			timestamp = time.Now()
 			clear(p.addresses.store)
 		} else {
-			exp.Success()
 			break
+		}
+
+		// Now is also a sane point in the function to determine if the parent wants us to stop spinning our
+		// hamster wheel trying to find a packet. We only check this so we gracefully exit instead of spamming
+		// DNS queries as we die.
+		if err := ctx.Err(); err != nil {
+			return nil, nil
 		}
 	}
 	// Reset our listening, it's a chance our NIC died in which case we need to restart this. I don't
@@ -240,7 +247,7 @@ HARD_RETRY:
 	for {
 		newCloser, err = p.startListening(url)
 		if err == nil {
-			p.addresses.socketed(p.addrType)
+			p.addresses.socketedLockFree(p.addrType)
 			break
 		}
 		// Now is a sane point in the function to determine if the parent wants us to stop spinning our
@@ -257,5 +264,6 @@ HARD_RETRY:
 		clear(p.addresses.store)
 		goto HARD_RETRY // Avoid recursion, if we made it here either we have a fresh restart the entire address pool is exhausted
 	}
+	slog.Debug("dns hard retry exit", "url", url, "ip", ip)
 	return ip, newCloser
 }

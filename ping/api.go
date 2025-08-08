@@ -175,7 +175,7 @@ const (
 func (p PingResults) String() string {
 	switch {
 	case p.IP == nil && p.InternalErr == nil:
-		return "DNS Failure (unknown) could not get IP"
+		return "DNS Failure could not get IP"
 	case p.InternalErr != nil:
 		return "Internal API Error " + timestampString(p.Data) + " reason " + p.InternalErr.Error()
 	default:

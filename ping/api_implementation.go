@@ -46,6 +46,10 @@ func (p *Ping) startChannel(ctx context.Context, client chan<- PingResults, clos
 				// Reset the timestamp, we were stuck in DNS for too long
 				timestamp = time.Now()
 			}
+			if ctx.Err() != nil {
+				// context was cancelled while DNS, just return
+				return
+			}
 
 			if errorDuringLoop = p.pingOnChannel(ctx, timestamp, ip, seq, client, buffer); errorDuringLoop {
 				// Keep track of this address as maybe being unreliable

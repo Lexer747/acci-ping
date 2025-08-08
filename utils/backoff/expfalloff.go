@@ -44,5 +44,8 @@ func (e *ExpFallOff) Fail() {
 
 // Duration returns the time that the backoff **would** wait if failure occurs.
 func (e *ExpFallOff) Duration() time.Duration {
-	return time.Duration(math.Pow(e.base, float64(e.curCount))) * time.Millisecond
+	computedBackOff := math.Pow(e.base, float64(e.curCount)) * float64(time.Millisecond)
+	// use min max to clamp the backoff between the base and the max duration
+	cappedBackOff := max(min(computedBackOff, math.MaxInt64/2), e.base)
+	return time.Duration(cappedBackOff)
 }

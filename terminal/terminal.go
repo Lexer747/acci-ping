@@ -19,6 +19,7 @@ import (
 	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/utils"
+	"github.com/Lexer747/acci-ping/utils/atomic"
 	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/errors"
 
@@ -56,7 +57,7 @@ func ParseSize(s string) (Size, bool) {
 //   - [NewParsedFixedSizeTerminal]
 //   - [NewTestTerminal]
 type Terminal struct {
-	size      Size
+	size      atomic.Of[Size]
 	listeners []ConditionalListener
 	fallbacks []Listener
 
@@ -94,7 +95,7 @@ func NewTerminal() (*Terminal, error) {
 		return nil, err
 	}
 	t := &Terminal{
-		size:          size,
+		size:          atomic.Init(size),
 		listeners:     []ConditionalListener{},
 		fallbacks:     []Listener{},
 		stdin:         os.Stdin,
@@ -121,7 +122,7 @@ func NewTerminal() (*Terminal, error) {
 // a real terminal environment is not setup.
 func NewFixedSizeTerminal(s Size) (*Terminal, error) {
 	t := &Terminal{
-		size:          s,
+		size:          atomic.Init(s),
 		listeners:     []ConditionalListener{},
 		fallbacks:     []Listener{},
 		stdin:         os.Stdin,
@@ -134,7 +135,7 @@ func NewFixedSizeTerminal(s Size) (*Terminal, error) {
 
 func NewDebuggingTerminal(s Size) (*Terminal, error) {
 	t := &Terminal{
-		size:          s,
+		size:          atomic.Init(s),
 		listeners:     []ConditionalListener{},
 		fallbacks:     []Listener{},
 		stdin:         os.Stdin,
@@ -175,7 +176,7 @@ func NewSize(size string) (Size, error) {
 func NewTestTerminal(stdinReader, stdoutWriter io.ReadWriter, terminalSizeCallBack func() Size) (*Terminal, error) {
 	size := terminalSizeCallBack()
 	return &Terminal{
-		size:                 size,
+		size:                 atomic.Init(size),
 		listeners:            []ConditionalListener{},
 		fallbacks:            []Listener{},
 		stdin:                stdinReader,
@@ -190,7 +191,7 @@ func NewTestTerminal(stdinReader, stdoutWriter io.ReadWriter, terminalSizeCallBa
 // GetSize gets the cached size of the terminal, as in it returns the value most recently attained from
 // [Terminal.UpdateSize], or if that has not been called the size of the terminal as initialised.
 func (t *Terminal) GetSize() Size {
-	return t.size
+	return t.size.Get()
 }
 
 // UpdateSize the terminals stored size. Retrieve the result with [Terminal.GetSize].
@@ -198,8 +199,8 @@ func (t *Terminal) UpdateSize() error {
 	if !t.isDynamicSize {
 		return nil
 	}
-	var err error
-	t.size, err = t.terminalSizeCallBack()
+	size, err := t.terminalSizeCallBack()
+	t.size.Set(size)
 	return err
 }
 
@@ -307,7 +308,7 @@ func (t *Terminal) ClearScreen(behaviour ClearBehaviour) error {
 			return errors.Wrap(err, "while ClearScreen")
 		}
 	}
-	t.Print(strings.Repeat("\n", t.size.Height))
+	t.Print(strings.Repeat("\n", t.size.Get().Height))
 	err := t.Print(ansi.Clear)
 	if behaviour == MoveHome || behaviour == UpdateSizeAndMoveHome {
 		err = errors.Join(err, t.Print(ansi.Home))

@@ -25,18 +25,18 @@ func (app *Application) help(
 ) {
 	helpBuffer := app.drawBuffer.Get(draw.HelpIndex)
 	h := help{showHelp: startShowHelp}
-	app.paint(h.render(app.term.GetSize(), helpBuffer))
+	app.GUIState.Paint(h.render(app.term.GetSize(), helpBuffer))
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case newSize := <-terminalSizeUpdates:
-			app.paint(h.render(newSize, helpBuffer))
+			app.GUIState.Paint(h.render(newSize, helpBuffer))
 		case toShow := <-helpChannel:
 			switch toShow {
 			case 'h':
 				h.showHelp = !h.showHelp
-				app.paint(h.render(app.term.GetSize(), helpBuffer))
+				app.GUIState.Paint(h.render(app.term.GetSize(), helpBuffer))
 			default:
 			}
 		}
@@ -47,17 +47,17 @@ type help struct {
 	showHelp bool
 }
 
-func (h help) render(size terminal.Size, buf *bytes.Buffer) paintUpdate {
-	ret := None
+func (h help) render(size terminal.Size, buf *bytes.Buffer) gui.PaintUpdate {
+	ret := gui.None
 	shouldInvalidate := buf.Len() != 0
 	if shouldInvalidate {
-		ret = ret | Invalidate
+		ret = ret | gui.Invalidate
 	}
 	buf.Reset()
 	if h.showHelp {
 		box := h.makeHelpBox()
 		box.Draw(size, buf)
-		return ret | Paint
+		return ret | gui.Paint
 	}
 	return ret
 }
@@ -82,24 +82,31 @@ func (h help) makeHelpBox() gui.Box {
 }
 
 func helpStartup() {
-	helpText := themes.Highlight("Help")
 	ctrlCText := themes.Positive("ctrl+c")
+	helpText := themes.Highlight("Help")
 	keyBindF := themes.Positive("f")
 	keyBindH := themes.Positive("h")
 	keyBindL := themes.Positive("l")
+	keyBindPlus := themes.Emphasis("+")
+	keyBindNegative := themes.Emphasis("-")
 
-	helpCopy = []gui.Typography{
-		{ToPrint: helpText, TextLen: 4, Alignment: gui.Centre},
-		{ToPrint: "", TextLen: 0, Alignment: gui.Centre},
-		{ToPrint: themes.Primary("Press ") + ctrlCText + themes.Primary(" to exit."),
+	helpCopy = append(helpCopy,
+		gui.Typography{ToPrint: helpText, TextLen: 4, Alignment: gui.Centre},
+		gui.Typography{ToPrint: "", TextLen: 0, Alignment: gui.Centre},
+		gui.Typography{ToPrint: themes.Primary("Press ") + ctrlCText + themes.Primary(" to exit."),
 			TextLen: 6 + 6 + 9, Alignment: gui.Left},
-		{ToPrint: themes.Primary("Press ") + keyBindF + themes.Primary(" to follow/unfollow the most recent data."),
+		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindF + themes.Primary(" to follow/unfollow the most recent data."),
 			TextLen: 6 + 1 + 41, Alignment: gui.Left},
-		{ToPrint: themes.Primary("Press ") + keyBindL + themes.Primary(" to switch to between log and linear y-axis."),
+		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindL + themes.Primary(" to switch to between log and linear y-axis."),
 			TextLen: 6 + 1 + 44, Alignment: gui.Left},
-		{ToPrint: themes.Primary("Press ") + keyBindH + themes.Primary(" to open/close this window."),
+		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindPlus + themes.Primary(" to speed up the data capture."),
+			TextLen: 6 + 1 + 30, Alignment: gui.Left},
+		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindNegative + themes.Primary(" to slow down the data capture."),
+			TextLen: 6 + 1 + 31, Alignment: gui.Left},
+		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindH + themes.Primary(" to open/close this window."),
 			TextLen: 6 + 1 + 27, Alignment: gui.Left},
-	}
+	)
 }
 
-var helpCopy = make([]gui.Typography, 0, 10)
+// TODO generate this size?
+var helpCopy = make([]gui.Typography, 0, 9)

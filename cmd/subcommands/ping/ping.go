@@ -38,7 +38,7 @@ func RunPing(c *Config) {
 	check.Check(c.Parsed(), "flags not parsed")
 	p := ping.NewPing()
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	channel, err := p.CreateChannel(ctx, *c.url, 45, 0)
+	channel, err := p.CreateChannel(ctx, *c.url, ping.NewPingsPerMinute(45), 0)
 	exit.OnErrorMsg(err, "Couldn't start ping channel")
 	if *c.count <= 0 {
 		defer cancelFunc()

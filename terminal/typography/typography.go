@@ -61,4 +61,11 @@ const (
 	LowerLine  = "\u23BC"
 	UpperLine  = "\u23BB"
 	TopLine    = "\u23BA"
+
+	UpArrow    = "\u2191"
+	RightArrow = "\u2192"
+	DownArrow  = "\u2193"
+	LeftArrow  = "\u2194"
+
+	DoubleUpArrow = "\u21D1"
 )

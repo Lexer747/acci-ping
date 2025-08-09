@@ -34,7 +34,7 @@ type Graph struct {
 	sinkAlive   bool
 	dataChannel <-chan ping.PingResults
 
-	pingsPerMinute float64
+	initial ping.PingsPerMinute
 
 	data *graphdata.GraphData
 
@@ -75,9 +75,9 @@ type GraphConfiguration struct {
 	// takes ownership of the terminal.
 	Terminal *terminal.Terminal
 	// Gui is the external GUI interface which the terminal will call [gui.Draw] on each frame if the gui
-	// component requires it. This
+	// component requires it.
 	Gui            gui.GUI
-	PingsPerMinute float64
+	PingsPerMinute ping.PingsPerMinute
 	URL            string
 	DrawingBuffer  *draw.Buffer
 	Presentation   Presentation
@@ -105,7 +105,7 @@ func NewGraph(ctx context.Context, cfg GraphConfiguration) *Graph {
 		Term:           cfg.Terminal,
 		sinkAlive:      true,
 		dataChannel:    cfg.Input,
-		pingsPerMinute: cfg.PingsPerMinute,
+		initial:        cfg.PingsPerMinute,
 		data:           graphdata.NewGraphData(cfg.Data),
 		frameMutex:     &sync.Mutex{},
 		lastFrame:      frame{},
@@ -141,7 +141,7 @@ func (g *Graph) Run(
 	listeners []terminal.ConditionalListener,
 	fallbacks []terminal.Listener,
 ) (func() error, func(), <-chan terminal.Size, error) {
-	timeBetweenFrames := getTimeBetweenFrames(fps, g.pingsPerMinute)
+	timeBetweenFrames := getTimeBetweenFrames(fps, g.initial)
 	frameRate := time.NewTicker(timeBetweenFrames)
 	cleanup, err := g.Term.StartRaw(ctx, stop, listeners, fallbacks)
 	if err != nil {
@@ -151,7 +151,7 @@ func (g *Graph) Run(
 	graph := func() error {
 		size := g.Term.GetSize()
 		defer close(terminalUpdates)
-		slog.Debug("running acci-ping")
+		slog.Info("running acci-ping")
 		for {
 			select {
 			case <-ctx.Done():
@@ -161,7 +161,7 @@ func (g *Graph) Run(
 					return err
 				}
 				if size != g.Term.GetSize() {
-					slog.Debug("sending size update", "size", size)
+					slog.Info("sending size update", "size", size)
 					terminalUpdates <- size
 					size = g.Term.GetSize()
 				}
@@ -249,20 +249,20 @@ func (g *Graph) handleControl(ctx context.Context) {
 				return
 			}
 			// Note we don't need the mutex while reading the values.
-			changed := p.FollowLatestSpan.DidChange || p.YAxisScale.DidChange
-			if changed {
+			guiChanged := p.FollowLatestSpan.DidChange || p.YAxisScale.DidChange
+			if guiChanged {
 				// But we do need it while writing
 				g.presentation.m.Lock()
 			}
 			if p.FollowLatestSpan.DidChange {
 				g.presentation.Following = p.FollowLatestSpan.Value
-				slog.Debug("switching to:", "FollowLatestSpan", p.FollowLatestSpan.Value)
+				slog.Info("switching to:", "FollowLatestSpan", p.FollowLatestSpan.Value)
 			}
 			if p.YAxisScale.DidChange {
 				g.presentation.YAxisScale = p.YAxisScale.Value
-				slog.Debug("switching to:", "YAxisScale", p.YAxisScale.Value)
+				slog.Info("switching to:", "YAxisScale", p.YAxisScale.Value)
 			}
-			if changed {
+			if guiChanged {
 				g.presentation.m.Unlock()
 			}
 		}
@@ -284,12 +284,12 @@ type frame struct {
 	framePainter      func(io.Writer) error
 	framePainterNoGui func(io.Writer) error
 	spinnerIndex      int
-	followLatestSpan  bool
+	cfg               computeFrameConfig
 }
 
-func (f frame) Match(s terminal.Size, followLatestSpan bool) bool {
+func (f frame) Match(s terminal.Size, cfg computeFrameConfig) bool {
 	return f.xAxis.size == s.Width && f.yAxis.size == s.Height &&
-		f.followLatestSpan == followLatestSpan
+		f.cfg.Match(cfg)
 }
 
 func (f frame) Size() terminal.Size {

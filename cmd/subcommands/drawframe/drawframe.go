@@ -25,12 +25,14 @@ import (
 	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/exit"
+	"github.com/Lexer747/acci-ping/utils/flags"
 )
 
 type Config struct {
 	cpuprofile  *string
 	debugFollow *bool
 	debugStrict *bool
+	helpDebug   *bool
 	logFile     *string
 	memprofile  *string
 	termSize    *string
@@ -55,18 +57,25 @@ func GetFlags(info *application.BuildInfo) *Config {
 		theme: f.String("theme", "", "the colour theme (either a path or builtin theme name) to use for the program,\n"+
 			"if empty this will try to get the background colour of the terminal and pick the\n"+
 			"built in dark or light theme based on the colour found.\n"+
-			"There's also the builtin list of themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
+			"There's also the builtin themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
 			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
 			" for how to create custom themes."),
 		yAxisScale: f.Bool("log-scale", false, "switches the y-axis to be in logarithmic scaling instead of linear"),
+		helpDebug:  f.Bool("help-debug", false, "prints all additional debug arguments"),
 		FlagSet:    f,
 	}
 	f.Usage = func() {
+		var programName = "acci-ping " + ansi.Green("drawframe")
+
 		w := flag.CommandLine.Output()
 		fmt.Fprintf(w, "Usage of %s: reads '.pings' files and outputs the final frame of the capture\n"+
 			"\t drawframe [options] FILE\n\n"+
-			"e.g. %s my_ping_capture.ping\n", os.Args[0], os.Args[0])
-		f.PrintDefaults()
+			"e.g. '%s my_ping_capture.ping'\n", programName, programName)
+		if ret.HelpDebug() {
+			flags.PrintFlagsFilter(ret.FlagSet, flags.NoFilter())
+		} else {
+			flags.PrintFlagsFilter(ret.FlagSet, flags.ExcludePrefix("debug"))
+		}
 	}
 	return ret
 }
@@ -100,6 +109,11 @@ func RunDrawFrame(c *Config) {
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
+}
+
+// TODO really do make this shared between things that want debug ...
+func (c *Config) HelpDebug() bool {
+	return *c.helpDebug
 }
 
 func run(term *terminal.Terminal, path string, profiling, logScale, debugFollow, debugStrict bool) {
@@ -160,9 +174,8 @@ func printGraph(term *terminal.Terminal, d *data.Data, logScale, debugFollow, de
 	g := graph.NewGraph(
 		context.Background(),
 		graph.GraphConfiguration{
-			Terminal:       term,
-			PingsPerMinute: 0,
-			DrawingBuffer:  draw.NewPaintBuffer(),
+			Terminal:      term,
+			DrawingBuffer: draw.NewPaintBuffer(),
 			Presentation: graph.Presentation{
 				Following:  debugFollow,
 				YAxisScale: scale,

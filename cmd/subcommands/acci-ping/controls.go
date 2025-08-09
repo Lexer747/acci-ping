@@ -25,13 +25,13 @@ func (app *Application) showControls(
 ) {
 	buffer := app.drawBuffer.Get(draw.ControlIndex)
 	c := controlState{Presentation: initialValues}
-	app.paint(c.render(app.term.GetSize(), buffer))
+	app.GUIState.Paint(c.render(app.term.GetSize(), buffer))
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case newSize := <-terminalSizeUpdates:
-			app.paint(c.render(newSize, buffer))
+			app.GUIState.Paint(c.render(newSize, buffer))
 		case update := <-fromTerminal:
 			if update.FollowLatestSpan.DidChange {
 				c.Following = update.FollowLatestSpan.Value
@@ -39,7 +39,7 @@ func (app *Application) showControls(
 			if update.YAxisScale.DidChange {
 				c.YAxisScale = update.YAxisScale.Value
 			}
-			app.paint(c.render(app.term.GetSize(), buffer))
+			app.GUIState.Paint(c.render(app.term.GetSize(), buffer))
 		}
 	}
 }
@@ -48,11 +48,11 @@ type controlState struct {
 	graph.Presentation
 }
 
-func (c controlState) render(size terminal.Size, buf *bytes.Buffer) paintUpdate {
-	ret := None
+func (c controlState) render(size terminal.Size, buf *bytes.Buffer) gui.PaintUpdate {
+	ret := gui.None
 	buf.Reset()
 	if !c.Following || c.YAxisScale != graph.Logarithmic {
-		ret = ret | Invalidate
+		ret = ret | gui.Invalidate
 	}
 	paint := false
 	var box gui.Box
@@ -69,7 +69,7 @@ func (c controlState) render(size terminal.Size, buf *bytes.Buffer) paintUpdate 
 	}
 	if paint {
 		box.Draw(size, buf)
-		return ret | Paint
+		return ret | gui.Paint
 	}
 	return ret
 }

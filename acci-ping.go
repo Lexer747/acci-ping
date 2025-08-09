@@ -21,6 +21,7 @@ import (
 	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/exit"
+	"github.com/Lexer747/acci-ping/utils/flags"
 )
 
 // these looking more bash variables helps clue me into where these
@@ -80,6 +81,7 @@ func main() {
 		case drawframeString:
 			df := drawframe.GetFlags(info)
 			FlagParseError(df.Parse(os.Args[2:]))
+			PrintHelpDebugIfNeeded(df.HelpDebug(), df.FlagSet)
 			drawframe.RunDrawFrame(df)
 			exit.Success()
 		case rawdataString:
@@ -104,11 +106,23 @@ func main() {
 	a := acciping.GetFlags(info)
 	a.Usage = func() {
 		subCommandUsage(a.Output())
-		a.PrintDefaults()
+		if a.HelpDebug() {
+			flags.PrintFlagsFilter(a.FlagSet, flags.NoFilter())
+		} else {
+			flags.PrintFlagsFilter(a.FlagSet, flags.ExcludePrefix("debug"))
+		}
 	}
 	FlagParseError(a.Parse(os.Args[1:]))
+	PrintHelpDebugIfNeeded(a.HelpDebug(), a.FlagSet)
 	acciping.RunAcciPing(a)
 	exit.Success()
+}
+
+func PrintHelpDebugIfNeeded(b bool, fs *flag.FlagSet) {
+	if b {
+		fs.Usage()
+		exit.Silent()
+	}
 }
 
 func subCommandUsage(w io.Writer) {

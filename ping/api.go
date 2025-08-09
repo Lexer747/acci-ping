@@ -22,11 +22,12 @@ import (
 )
 
 type Ping struct {
-	connect    *icmp.PacketConn
-	addrType   addressType
-	id         uint16
-	currentURL string
-	timeout    time.Duration
+	connect       *icmp.PacketConn
+	addrType      addressType
+	id            uint16
+	currentURL    string
+	timeout       time.Duration
+	ratelimitTime time.Duration
 
 	echoType, echoReply icmp.Type
 
@@ -116,18 +117,54 @@ func (p *Ping) OneShot(url string) (time.Duration, error) {
 	}
 }
 
-func (p *Ping) CreateChannel(ctx context.Context, url string, pingsPerMinute float64, channelSize int) (<-chan PingResults, error) {
-	if pingsPerMinute < 0 {
-		return nil, errors.Errorf("Invalid pings per minute %f, should be larger than 0", pingsPerMinute)
-	}
+// CreateChannel returns a channel of asynchronous ping results at the frequency of at most [rate], it may be
+// slower is the network latency is larger than rate. Network error's are handled gracefully and will be on
+// the channel as dropped packets, this function only returns an error if the internal state could not be
+// configured or networking is completely disabled on this client.
+func (p *Ping) CreateChannel(
+	ctx context.Context,
+	url string,
+	rate PingsPerMinute,
+	channelSize int,
+) (<-chan PingResults, error) {
+	result, _, err := p.CreateFlexibleChannel(ctx, url, rate, channelSize)
+	return result, err
+}
 
+// PingsPerMinute represents how many pings per minute the [Ping] should target when [Ping.OneShot],
+// [Ping.CreateChannel] or [Ping.CreateFlexibleChannel] is called. Use [AsFastAsPossible] or
+// [NewPingsPerMinute] to create a [PingsPerMinute].
+type PingsPerMinute struct {
+	v float64
+}
+
+func AsFastAsPossible() PingsPerMinute {
+	return PingsPerMinute{v: 0}
+}
+
+// NewPingsPerMinute less than 0 is treated as [AsFastAsPossible].
+func NewPingsPerMinute(ppm float64) PingsPerMinute {
+	if ppm < 0 {
+		return PingsPerMinute{v: 0}
+	}
+	return PingsPerMinute{v: ppm}
+}
+
+// CreateFlexibleChannel is similar to [Ping.CreateChannel] but the speed of the channel can be updated by the
+// second returned channel. Using [Speed].
+func (p *Ping) CreateFlexibleChannel(
+	ctx context.Context,
+	url string,
+	initialRate PingsPerMinute,
+	channelSize int,
+) (<-chan PingResults, chan<- Speed, error) {
 	// Create a listener for the IP we will use
 	closer, err := p.startListening(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	rateLimit := p.buildRateLimiting(pingsPerMinute)
+	initialRateLimit := p.buildRateLimiting(initialRate)
 
 	dnsTimeout, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
@@ -139,8 +176,9 @@ func (p *Ping) CreateChannel(ctx context.Context, url string, pingsPerMinute flo
 	p.addresses.m.Unlock()
 
 	client := make(chan PingResults, channelSize)
-	p.startChannel(ctx, client, closer, url, rateLimit)
-	return client, nil
+	speedChannel := make(chan Speed, channelSize)
+	p.startChannel(ctx, client, closer, url, initialRateLimit, speedChannel)
+	return client, speedChannel, nil
 }
 
 type PingResults struct {
@@ -172,6 +210,40 @@ const (
 	TestDrop = 0xfe
 )
 
+type Speed byte
+
+const (
+	Faster Speed = iota
+	Slower
+	Fastest
+)
+
+func (s Speed) Delta(duration time.Duration) time.Duration {
+	switch s {
+	case Faster:
+		return duration - (250 * time.Millisecond)
+	case Slower:
+		return duration + (250 * time.Millisecond)
+	case Fastest:
+		return 0
+	default:
+		panic("exhaustive:enforce")
+	}
+}
+
+func (s Speed) String() string {
+	switch s {
+	case Faster:
+		return "Faster"
+	case Slower:
+		return "Slower"
+	case Fastest:
+		return "Fastest"
+	default:
+		panic("exhaustive:enforce")
+	}
+}
+
 func (p PingResults) String() string {
 	switch {
 	case p.IP == nil && p.InternalErr == nil:
@@ -200,10 +272,10 @@ func (p PingDataPoint) Equal(other PingDataPoint) bool {
 	return p.Duration == other.Duration && p.Timestamp.Equal(other.Timestamp) && p.DropReason == other.DropReason
 }
 
-func PingsPerMinuteToDuration(pingsPerMinute float64) time.Duration {
-	if pingsPerMinute == 0 {
+func PingsPerMinuteToDuration(pingsPerMinute PingsPerMinute) time.Duration {
+	if pingsPerMinute.v == 0 {
 		return 0
 	}
-	gapBetweenPings := math.Round((60 * 1000) / (pingsPerMinute))
+	gapBetweenPings := math.Round((60 * 1000) / pingsPerMinute.v)
 	return time.Millisecond * time.Duration(gapBetweenPings)
 }

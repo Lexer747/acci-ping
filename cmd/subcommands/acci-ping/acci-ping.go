@@ -25,6 +25,7 @@ type Config struct {
 	debugStrict        *bool
 	filePath           *string
 	hideHelpOnStart    *bool
+	helpDebug          *bool
 	logFile            *string
 	memprofile         *string
 	pingBufferingLimit *int
@@ -46,7 +47,7 @@ func GetFlags(info *application.BuildInfo) *Config {
 		debugStrict:        f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
 		filePath:           f.String("file", "", "the file to write the pings into. (default data not saved)"),
 		hideHelpOnStart:    f.Bool("hide-help", false, "if this flag is used the help box will be hidden by default"),
-		logFile:            f.String("l", "", "write logs to `file`. (default no logs written)"),
+		logFile:            f.String("debug-log", "", "write logs to `file`. (default no logs written)"),
 		memprofile:         f.String("memprofile", "", "write memory profile to `file`"),
 		pingBufferingLimit: new(int),
 		pingsPerMinute: f.Float64("pings-per-minute", 60.0,
@@ -58,10 +59,11 @@ func GetFlags(info *application.BuildInfo) *Config {
 		theme: f.String("theme", "", "the colour theme (either a path or builtin theme name) to use for the program,\n"+
 			"if empty this will try to get the background colour of the terminal and pick the\n"+
 			"built in dark or light theme based on the colour found.\n"+
-			"There's also the builtin list of themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
+			"There's also the builtin themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
 			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
 			" for how to create custom themes."),
-		debuggingTermSize: f.String("debugging-term-size", "", "switches the terminal to fixed mode and no iteractivity"),
+		debuggingTermSize: f.String("debug-term-size", "", "switches the terminal to fixed mode and no iteractivity"),
+		helpDebug:         f.Bool("help-debug", false, "prints all additional debug arguments"),
 		FlagSet:           f,
 	}
 	*ret.pingBufferingLimit = 10
@@ -87,4 +89,8 @@ func RunAcciPing(c *Config) {
 	} else {
 		app.Finish()
 	}
+}
+
+func (c *Config) HelpDebug() bool {
+	return *c.helpDebug
 }

@@ -21,7 +21,7 @@
                 "-memprofile",
                 "mem.prof",
                 "-debug-strict",
-                "-debugging-term-size",
+                "-debug-term-size",
                 "20x20"
             ],
             "program": "${workspaceFolder}"

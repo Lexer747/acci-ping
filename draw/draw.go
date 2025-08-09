@@ -23,6 +23,9 @@ type Buffer struct {
 }
 
 // TODO paint buffer should be application level and agnostic to the draw buffer itself.
+//
+// TODO this buffering has race conditions, data can be written to the paint buffer while it's being read for
+// painting. A full investigation is required to determine if this is actually a problem.
 func NewPaintBuffer() *Buffer {
 	return newBuffer(int(indexCount.Load()))
 }
@@ -43,11 +46,12 @@ func (b *Buffer) Reset(toReset ...Index) {
 
 var (
 	BarIndex      = newIndex()
-	DroppedIndex  = newIndex()
+	ControlIndex  = newIndex()
 	DataIndex     = newIndex()
+	DroppedIndex  = newIndex()
+	EmojiIndex    = newIndex()
 	GradientIndex = newIndex()
 	HelpIndex     = newIndex()
-	ControlIndex  = newIndex()
 	KeyIndex      = newIndex()
 	SpinnerIndex  = newIndex()
 	ToastIndex    = newIndex()
@@ -73,6 +77,7 @@ var PaintOrder = []Index{
 	ToastIndex,
 	ControlIndex,
 	HelpIndex,
+	EmojiIndex,
 	// if we can't see the spinner we may be worried the program is dead
 	SpinnerIndex,
 }
@@ -80,12 +85,13 @@ var PaintOrder = []Index{
 // GraphIndexes is the [PaintOrder] with the GUI indexes removed
 var GraphIndexes = sliceutils.Remove(PaintOrder,
 	ControlIndex,
+	EmojiIndex,
 	HelpIndex,
 	SpinnerIndex,
 	ToastIndex,
 )
 
-// GUIIndexes is the above paint order with the GraphIndexes indexes removed
+// GUIIndexes is the above paint order with the [GraphIndexes] indexes removed
 var GUIIndexes = sliceutils.Remove(PaintOrder, GraphIndexes...)
 
 // newBuffer creates a new [Buffer] of [n] z-buffers.

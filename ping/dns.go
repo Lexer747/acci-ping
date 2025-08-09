@@ -32,6 +32,10 @@ type queryCache struct {
 	maxDrops uint
 }
 
+func (q *queryCache) reset() {
+	q.index = 0
+}
+
 func (q *queryCache) socketedLockFree(addrType addressType) {
 	check.Check(addrType != _UNRESOLVED, "cannot socket query cache to _UNRESOLVED")
 
@@ -184,6 +188,8 @@ func (q *queryCache) _DNSQuery(ctx context.Context, url string, addrType address
 	if len(results) == 0 {
 		return errors.Errorf("Couldn't resolve %q to a valid IP address (DNS failure)", url)
 	}
+	// reset the index, the length has changed
+	q.reset()
 	q.store = results
 	return nil
 }
@@ -219,7 +225,7 @@ HARD_RETRY:
 		// FWIW I don't think this timeout actually makes a difference on most platforms, it seems like OS
 		// controlled Dialer and Resolver Timeouts come into effect before this will. It may also be
 		// https://github.com/golang/go/issues/36848
-		dnsTimeout, cancel := context.WithTimeoutCause(ctx, p.timeout, timeoutErr)
+		dnsTimeout, cancel := context.WithTimeoutCause(ctx, timeoutErr.Duration, timeoutErr)
 		defer cancel()
 		err = p.addresses._DNSQuery(dnsTimeout, url, _UNRESOLVED)
 		if err != nil {

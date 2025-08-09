@@ -101,7 +101,7 @@ func GetLoaded() Theme {
 
 // LoadTheme updates the global theme with this new theme [t].
 func LoadTheme(t Theme) {
-	slog.Debug("loaded new theme", "theme", t)
+	slog.Info("loaded new theme", "theme", t)
 	globalTheme = t
 }
 

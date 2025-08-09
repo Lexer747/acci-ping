@@ -68,6 +68,12 @@ func Join[S ~[]T, T fmt.Stringer](slice S, sep string) string {
 	return strings.Join(Map(slice, T.String), sep)
 }
 
+// JoinFunc will call [strings.Join] with the separator on the slice after applying [f] to every element,
+// returning the result.
+func JoinFunc[S ~[]T, T any](slice S, f func(T) string, sep string) string {
+	return strings.Join(Map(slice, f), sep)
+}
+
 // Remove will remove the elements from the [slice], if no elements are found in the [slice] then a shallow
 // copy is returned.
 func Remove[S ~[]T, T comparable](slice S, elements ...T) S {

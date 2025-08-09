@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
@@ -23,6 +24,23 @@ import (
 	"pgregory.net/rapid"
 )
 
+// TestWithTimeout allows a test function to **always** run with a timeout similar to the `go test` built in
+// `-timeout` flag.
+func TestWithTimeout(t T, timeout time.Duration, test func()) {
+	c := time.After(timeout)
+	done := make(chan struct{})
+	go func() {
+		test()
+		done <- struct{}{}
+	}()
+	select {
+	case <-c:
+		t.Fatalf("Test timed out after %s", timeout.String())
+	case <-done:
+	}
+}
+
+// AssertFloatEqual checks that the two floats are equal within the given significant figures.
 func AssertFloatEqual(t T, expected float64, actual float64, sigFigs int, msgAndArgs ...any) {
 	t.Helper()
 	a := numeric.RoundToNearestSigFig(actual, sigFigs)

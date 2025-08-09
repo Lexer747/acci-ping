@@ -8,6 +8,7 @@ package ping
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
@@ -24,13 +25,16 @@ func timestampString(p PingDataPoint) string {
 	return p.Timestamp.Format(time.RFC3339Nano)
 }
 
-func (p *Ping) startChannel(ctx context.Context, client chan<- PingResults, closer func(), url string, rateLimit *time.Ticker) {
-	// TODO we actually need two goroutines, one for reading one for writing, then we should have a timer per
-	// sent packet, and match them up according to the ID and sequence number. This would ensure more than one
-	// client can work and that we maintain a matched tick rate should packets timeout and slow down the
-	// sending routine.
-
+func (p *Ping) startChannel(
+	ctx context.Context,
+	client chan<- PingResults,
+	closer func(),
+	url string,
+	initialRateLimit *time.Ticker,
+	speedChannel <-chan Speed,
+) {
 	run := func() {
+		rateLimit := initialRateLimit
 		defer close(client)
 		defer closer()
 		var seq uint16
@@ -56,9 +60,18 @@ func (p *Ping) startChannel(ctx context.Context, client chan<- PingResults, clos
 				p.addresses.Dropped(ip)
 			}
 			seq++ // Deliberate wrap-around
+		WAITING:
 			select {
 			case <-ctx.Done():
 				return
+			case newSpeed := <-speedChannel:
+				if rateLimit != nil {
+					rateLimit.Stop()
+				}
+				timeout := newSpeed.Delta(p.ratelimitTime)
+				rateLimit = p.buildRateLimitingDur(timeout)
+				// receiving input on this channel shouldn't trigger another network request
+				goto WAITING
 			default:
 				if rateLimit != nil {
 					// This throttles us if required, it will also drop ticks if we are pinging something very slow
@@ -70,15 +83,23 @@ func (p *Ping) startChannel(ctx context.Context, client chan<- PingResults, clos
 	go run()
 }
 
-func (p *Ping) buildRateLimiting(pingsPerMinute float64) *time.Ticker {
-	p.timeout = 500 * time.Millisecond
+func (p *Ping) buildRateLimiting(pingsPerMinute PingsPerMinute) *time.Ticker {
+	return p.buildRateLimitingDur(PingsPerMinuteToDuration(pingsPerMinute))
+}
+func (p *Ping) buildRateLimitingDur(timeout time.Duration) *time.Ticker {
+	initial := 500 * time.Millisecond
 	var rateLimit *time.Ticker
 	// Zero is the sentinel, go as fast as possible
-	if pingsPerMinute != 0 {
-		maxPingDuration := PingsPerMinuteToDuration(pingsPerMinute)
-		rateLimit = time.NewTicker(maxPingDuration)
-		p.timeout = max(min(p.timeout, maxPingDuration), 500*time.Millisecond)
+	if timeout > 0 {
+		actual := max(min(initial, timeout), 500*time.Millisecond)
+		rateLimit = time.NewTicker(timeout)
+		p.ratelimitTime = timeout
+		slog.Debug("Setting new timeout and ratelimiter", "initial", initial, "actualDur", actual, "rateLimit", timeout)
+		initial = actual
+	} else {
+		slog.Debug("Setting new timeout and ratelimiter", "initial", initial, "rateLimit", "none")
 	}
+	p.timeout = initial
 	return rateLimit
 }
 
@@ -136,7 +157,7 @@ func (p *Ping) pingOnChannel(
 	}
 	begin := time.Now()
 	timeoutErr := pingTimeout{Duration: p.timeout}
-	timeoutCtx, cancel := context.WithTimeoutCause(ctx, p.timeout, timeoutErr)
+	timeoutCtx, cancel := context.WithTimeoutCause(ctx, timeoutErr.Duration, timeoutErr)
 	defer cancel()
 	n, err := p.pingRead(timeoutCtx, buffer)
 	duration := time.Since(begin)

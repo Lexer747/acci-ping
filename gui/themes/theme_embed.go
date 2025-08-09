@@ -37,13 +37,14 @@ func DescribeBuiltins() []string {
 	slices.SortFunc(builtIns, func(a, b themeJSON) int { return cmp.Compare(a.Name, b.Name) })
 	return sliceutils.Map(builtIns, func(t themeJSON) string {
 		theme := check.Must(t.Theme())
-		return "\t- " + theme.titleHighlight.Do(t.Name) + " | Primary:" + theme.primary.Do(typography.Block) +
-			" Secondary:" + theme.secondary.Do(typography.Block) +
-			" Emphasis:" + theme.emphasis.Do(typography.Block) +
-			" Highlight:" + theme.highlight.Do(typography.Block) +
-			" TitleHighlight:" + theme.titleHighlight.Do(typography.Block) +
-			" Positive:" + theme.positive.Do(typography.Block) +
-			" Negative:" + theme.negative.Do(typography.Block)
+		const demo = typography.Block + typography.Block
+		return "\t- " + theme.titleHighlight.Do(t.Name) + " | Primary:" + theme.primary.Do(demo) +
+			" Secondary:" + theme.secondary.Do(demo) +
+			" Emphasis:" + theme.emphasis.Do(demo) +
+			" Highlight:" + theme.highlight.Do(demo) +
+			" TitleHighlight:" + theme.titleHighlight.Do(demo) +
+			" Positive:" + theme.positive.Do(demo) +
+			" Negative:" + theme.negative.Do(demo)
 	})
 }
 

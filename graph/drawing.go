@@ -34,9 +34,14 @@ type computeFrameConfig struct {
 	yAxisScale        YAxisScale
 }
 
+func (c computeFrameConfig) Match(cfg computeFrameConfig) bool {
+	return c.followLatestSpan == cfg.followLatestSpan &&
+		c.yAxisScale == cfg.yAxisScale
+}
+
 const drawingDebug = false
 
-func getTimeBetweenFrames(fps int, pingsPerMinute float64) time.Duration {
+func getTimeBetweenFrames(fps int, pingsPerMinute ping.PingsPerMinute) time.Duration {
 	if fps == 0 {
 		return ping.PingsPerMinuteToDuration(pingsPerMinute)
 	} else {
@@ -53,10 +58,6 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 	s := g.Term.GetSize()
 	g.data.Lock()
 	count := g.data.LockFreeTotalCount()
-	if count == 0 {
-		g.data.Unlock()
-		return noFrame // no data yet
-	}
 	spinnerValue := ""
 	if cfg.drawSpinner {
 		g.lastFrame.spinnerIndex++
@@ -64,7 +65,7 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 		g.drawingBuffer.Get(draw.SpinnerIndex).Reset()
 		g.drawingBuffer.Get(draw.SpinnerIndex).WriteString(spinnerValue)
 	}
-	if count == g.lastFrame.PacketCount && g.lastFrame.Match(s, cfg.followLatestSpan) {
+	if count == g.lastFrame.PacketCount && g.lastFrame.Match(s, cfg) {
 		g.data.Unlock() // fast path the frame didn't change
 		if updateGui := g.checkGUI(); updateGui != nil {
 			return updateGui
@@ -73,6 +74,11 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 		return func(w io.Writer) error {
 			return utils.Err(w.Write([]byte(spinnerValue)))
 		}
+	}
+	if count == 0 {
+		// nothing to do
+		g.data.Unlock()
+		return noFrame
 	}
 
 	g.drawingBuffer.Reset(draw.GraphIndexes...)
@@ -115,7 +121,7 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 		spinnerIndex:      g.lastFrame.spinnerIndex,
 		framePainter:      paintFrame,
 		framePainterNoGui: noGUI,
-		followLatestSpan:  cfg.followLatestSpan,
+		cfg:               cfg,
 	}
 
 	return paintFrame

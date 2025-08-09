@@ -32,12 +32,15 @@ program via the normal control-c.
 <details>
 <summary><b>🐛 Debug Arguments</b></summary>
 
-* `-l [file]`
+* `-debug-log [file]`
         write logs to file. (default no logs written)
 * `-debug-error-creator`
         binds the [e] key to create errors for GUI verification
 * `-debug-strict`
         enables more strict operation in which warnings turn into crashes.
+* `debug-term-size`
+        disables raw mode and greatly simplifies terminal integration by forcing a fixed size, not recommended
+        for use at all.
 * `-cpuprofile [file]`
         write cpu profile to file
 * `-memprofile [file]`

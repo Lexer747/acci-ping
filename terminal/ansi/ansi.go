@@ -107,24 +107,22 @@ var r = FormattingReset
 
 // Colours Section:
 
-func Black(s string) string     { return CSI + "30m" + s + r }
-func Gray(s string) string      { return CSI + "90m" + s + r }
-func LightGray(s string) string { return CSI + "37m" + s + r }
-func White(s string) string     { return CSI + "97m" + s + r }
-
-func DarkRed(s string) string     { return CSI + "31m" + s + r }
-func DarkGreen(s string) string   { return CSI + "32m" + s + r }
-func DarkYellow(s string) string  { return CSI + "33m" + s + r }
+func Black(s string) string       { return CSI + "30m" + s + r }
+func Blue(s string) string        { return CSI + "94m" + s + r }
+func Cyan(s string) string        { return CSI + "96m" + s + r }
 func DarkBlue(s string) string    { return CSI + "34m" + s + r }
-func DarkMagenta(s string) string { return CSI + "35m" + s + r }
 func DarkCyan(s string) string    { return CSI + "36m" + s + r }
-
-func Red(s string) string     { return CSI + "91m" + s + r }
-func Green(s string) string   { return CSI + "92m" + s + r }
-func Yellow(s string) string  { return CSI + "93m" + s + r }
-func Blue(s string) string    { return CSI + "94m" + s + r }
-func Magenta(s string) string { return CSI + "95m" + s + r }
-func Cyan(s string) string    { return CSI + "96m" + s + r }
+func DarkGreen(s string) string   { return CSI + "32m" + s + r }
+func DarkMagenta(s string) string { return CSI + "35m" + s + r }
+func DarkRed(s string) string     { return CSI + "31m" + s + r }
+func DarkYellow(s string) string  { return CSI + "33m" + s + r }
+func Gray(s string) string        { return CSI + "90m" + s + r }
+func Green(s string) string       { return CSI + "92m" + s + r }
+func LightGray(s string) string   { return CSI + "37m" + s + r }
+func Magenta(s string) string     { return CSI + "95m" + s + r }
+func Red(s string) string         { return CSI + "91m" + s + r }
+func White(s string) string       { return CSI + "97m" + s + r }
+func Yellow(s string) string      { return CSI + "93m" + s + r }
 
 // 256 Colours (8-bit)
 

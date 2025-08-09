@@ -42,8 +42,9 @@ type Application struct {
 	// think this is fine when the slice doesn't grow).
 	drawBuffer *draw.Buffer
 
-	errorChannel chan error
-	controlPlane chan graph.Control
+	errorChannel      chan error
+	graphControlPlane chan graph.Control
+	speedChange       chan<- ping.Speed
 }
 
 func (app *Application) Run(
@@ -70,7 +71,8 @@ func (app *Application) Run(
 	app.drawBuffer = draw.NewPaintBuffer()
 
 	helpCh := make(chan rune)
-	controlCh := make(chan graph.Control)
+	guiControlChannel := make(chan graph.Control)
+	guiSpeedChange := make(chan ping.Speed)
 	app.addFallbackListener(helpAction(helpCh))
 
 	// TODO make it a command line setting to populate at start
@@ -85,11 +87,11 @@ func (app *Application) Run(
 		graph.GraphConfiguration{
 			Input:          graphChannel,
 			Terminal:       app.term,
-			Gui:            app.GUI,
-			PingsPerMinute: *app.config.pingsPerMinute,
+			Gui:            app.GUIState,
+			PingsPerMinute: ping.NewPingsPerMinute(*app.config.pingsPerMinute),
 			DrawingBuffer:  app.drawBuffer,
 			Presentation:   control,
-			ControlPlane:   app.controlPlane,
+			ControlPlane:   app.graphControlPlane,
 			DebugStrict:    *app.config.debugStrict,
 			Data:           existingData,
 		},
@@ -99,44 +101,14 @@ func (app *Application) Run(
 	if *app.config.testErrorListener {
 		app.makeErrorGenerator()
 	}
-	app.addListener('f', func(rune) error {
-		control.Following = !control.Following
-		update := graph.Control{
-			FollowLatestSpan: graph.Change[bool]{
-				DidChange: true,
-				Value:     control.Following,
-			},
-			YAxisScale: graph.Change[graph.YAxisScale]{DidChange: false},
-		}
-		app.controlPlane <- update
-		controlCh <- update
-		return nil
-	})
-	app.addListener('l', func(rune) error {
-		switch control.YAxisScale {
-		case graph.Linear:
-			control.YAxisScale = graph.Logarithmic
-		case graph.Logarithmic:
-			control.YAxisScale = graph.Linear
-		}
-		update := graph.Control{
-			FollowLatestSpan: graph.Change[bool]{DidChange: false},
-			YAxisScale: graph.Change[graph.YAxisScale]{
-				DidChange: true,
-				Value:     control.YAxisScale,
-			},
-		}
-		app.controlPlane <- update
-		controlCh <- update
-		return nil
-	})
-
+	app.addListeners(control, guiSpeedChange, guiControlChannel)
 	defer close(app.errorChannel)
-	defer close(app.controlPlane)
+	defer close(app.graphControlPlane)
 	defer close(helpCh)
-	defer close(controlCh)
+	defer close(guiControlChannel)
+	defer close(guiSpeedChange)
 	// Very high FPS is good for responsiveness in the UI (since it's locked) and re-drawing on a re-size.
-	// TODO add UI listeners, zooming, changing ping speed - etc
+	// TODO configure FPS via command line or other options
 	graph, cleanup, terminalSizeUpdates, err := app.g.Run(ctx, cancelFunc, 120, app.listeners(), app.fallbacks)
 	termRecover := func() {
 		_ = app.term.ClearScreen(terminal.UpdateSize)
@@ -145,7 +117,7 @@ func (app *Application) Run(
 			panic(err)
 		}
 	}
-	terminalUpdates := channels.FanInFanOut(ctx, terminalSizeUpdates, 0, 3)
+	terminalUpdates := channels.FanInFanOut(ctx, terminalSizeUpdates, 0, 4)
 
 	// https://go.dev/ref/spec#Handling_panics
 	// https://go.dev/blog/defer-panic-and-recover
@@ -167,11 +139,67 @@ func (app *Application) Run(
 	}()
 	go func() {
 		defer termRecover()
-		app.showControls(ctx, control, controlCh, terminalUpdates[2])
+		app.showControls(ctx, control, guiControlChannel, terminalUpdates[2])
+	}()
+	go func() {
+		defer termRecover()
+		app.showSpeedChanges(ctx, guiSpeedChange, terminalUpdates[3])
 	}()
 	defer termRecover()
 	exit.OnError(err)
 	return graph()
+}
+
+// addListeners will add all the listeners to the application which will be forwarded to the terminal for
+// execution when the specified key is pressed.
+func (app *Application) addListeners(control graph.Presentation, guiSpeedChange chan ping.Speed, guiControlChannel chan graph.Control) {
+	app.addListener('f', func(rune) error {
+		control.Following = !control.Following
+		update := graph.Control{
+			FollowLatestSpan: graph.Change[bool]{
+				DidChange: true,
+				Value:     control.Following,
+			},
+		}
+		go func() {
+			app.graphControlPlane <- update
+			guiControlChannel <- update
+		}()
+		return nil
+	})
+	app.addListener('l', func(rune) error {
+		switch control.YAxisScale {
+		case graph.Linear:
+			control.YAxisScale = graph.Logarithmic
+		case graph.Logarithmic:
+			control.YAxisScale = graph.Linear
+		}
+		update := graph.Control{
+			YAxisScale: graph.Change[graph.YAxisScale]{
+				DidChange: true,
+				Value:     control.YAxisScale,
+			},
+		}
+		go func() {
+			app.graphControlPlane <- update
+			guiControlChannel <- update
+		}()
+		return nil
+	})
+	app.addListener('+', func(rune) error {
+		go func() {
+			app.speedChange <- ping.Faster
+			guiSpeedChange <- ping.Faster
+		}()
+		return nil
+	})
+	app.addListener('-', func(rune) error {
+		go func() {
+			app.speedChange <- ping.Slower
+			guiSpeedChange <- ping.Slower
+		}()
+		return nil
+	})
 }
 
 func appThemeStartUp() {
@@ -182,7 +210,7 @@ func appThemeStartUp() {
 func (app *Application) Init(ctx context.Context, c Config) (<-chan ping.PingResults, *data.Data) {
 	app.config = c
 	app.errorChannel = make(chan error)
-	app.controlPlane = make(chan graph.Control)
+	app.graphControlPlane = make(chan graph.Control)
 	app.GUI = newGUIState()
 	p := ping.NewPing()
 	var err error
@@ -196,10 +224,16 @@ func (app *Application) Init(ctx context.Context, c Config) (<-chan ping.PingRes
 		existingData = data.NewData(*c.url)
 	}
 
-	channel, err := p.CreateChannel(ctx, existingData.URL, *c.pingsPerMinute, *c.pingBufferingLimit)
+	channel, speedChange, err := p.CreateFlexibleChannel(
+		ctx,
+		existingData.URL,
+		ping.NewPingsPerMinute(*c.pingsPerMinute),
+		*c.pingBufferingLimit,
+	)
 	// If Creating the channel has an error this means we cannot continue, the network errors are already
 	// wrapped and retried by this channel, other errors imply some larger problem
 	exit.OnError(err)
+	app.speedChange = speedChange
 	err = application.LoadTheme(*c.theme, app.term)
 	appThemeStartUp()
 	go func() { app.errorChannel <- err }()
@@ -258,6 +292,8 @@ func (app *Application) makeErrorGenerator() {
 	)
 }
 
+// addListener ensures that no key was double registered and creates the boiler plate required by the
+// terminal.
 func (app *Application) addListener(r rune, Action func(rune) error) {
 	if _, found := app.listeningChars[r]; found {
 		panic(fmt.Sprintf("Adding more than one listener for '%v'", r))
@@ -273,6 +309,7 @@ func (app *Application) addListener(r rune, Action func(rune) error) {
 	}
 }
 
+// creates a fallback listener see [terminal.Listener]
 func (app *Application) addFallbackListener(Action func(rune) error) {
 	app.fallbacks = append(app.fallbacks, terminal.Listener{
 		Action: Action,

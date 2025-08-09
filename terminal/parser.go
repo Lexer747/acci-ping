@@ -66,7 +66,7 @@ func (t *Terminal) tryGetBackgroundColour() bool {
 	fail := func(err error) {
 		slog.Info("Failed to get background colour falling back to dark theme", "underlying reason", err.Error())
 	}
-	slog.Debug("Reading background colour query from terminal")
+	slog.Info("Reading background colour query from terminal")
 
 	_, err := t.stdin.Write([]byte(ansi.OSC + "11;?\x07"))
 	if err != nil {
@@ -118,7 +118,7 @@ func (t *Terminal) tryGetBackgroundColour() bool {
 			fail(err)
 			return
 		}
-		slog.Debug("done", "r", red, "g", green, "b", blue)
+		slog.Info("background colour query done", "r", red, "g", green, "b", blue)
 		result <- rgb{red: red, green: green, blue: blue}
 	}()
 

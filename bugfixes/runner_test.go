@@ -7,6 +7,7 @@
 package bugfixes_test
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"os"
@@ -30,7 +31,7 @@ func init() {
 var path string
 
 func preBuild() (string, error) {
-	build := exec.Command("/bin/bash", "./tools/build.sh", "unit-tests")
+	build := exec.CommandContext(context.Background(), "/bin/bash", "./tools/build.sh", "unit-tests")
 	build.Dir = "../" + build.Dir
 	// TODO support other CI envs
 	return "./../out/linux/amd64/", build.Run()
@@ -93,7 +94,7 @@ func parseFileTestType(t *testing.T, testFile io.Reader, testName string) testTy
 func runScriptAndAssert(t *testing.T, reproScript string, testType testType) {
 	t.Helper()
 	// (G204) this a directly controlled part of the repo in a test not a security risk
-	cmd := exec.Command("/bin/bash", reproScript) //nolint:gosec
+	cmd := exec.CommandContext(context.Background(), "/bin/bash", reproScript) //nolint:gosec
 	stderr := strings.Builder{}
 	cmd.Stderr = &stderr
 	stdout := strings.Builder{}

@@ -33,6 +33,7 @@ import (
 
 type Application struct {
 	*GUI
+
 	g    *graph.Graph
 	term *terminal.Terminal
 
@@ -109,7 +110,7 @@ func (app *Application) Run(
 	defer close(guiSpeedChange)
 	// Very high FPS is good for responsiveness in the UI (since it's locked) and re-drawing on a re-size.
 	// TODO configure FPS via command line or other options
-	graph, cleanup, terminalSizeUpdates, err := app.g.Run(ctx, cancelFunc, 120, app.listeners(), app.fallbacks)
+	graph, cleanup, terminalSizeUpdates, err := app.g.Run(ctx, cancelFunc, 240, app.listeners(), app.fallbacks)
 	termRecover := func() {
 		_ = app.term.ClearScreen(terminal.UpdateSize)
 		cleanup()
@@ -148,6 +149,57 @@ func (app *Application) Run(
 	defer termRecover()
 	exit.OnError(err)
 	return graph()
+}
+
+func (app *Application) Init(ctx context.Context, c Config) (<-chan ping.PingResults, *data.Data) {
+	app.config = c
+	app.errorChannel = make(chan error)
+	app.graphControlPlane = make(chan graph.Control)
+	app.GUI = newGUIState()
+	p := ping.NewPing()
+	var err error
+	app.term, err = makeTerminal(c.debuggingTermSize)
+	exit.OnError(err) // If we can't open the terminal for any reason we reasonably can't do anything this program offers.
+
+	var existingData *data.Data
+	if *c.filePath != "" {
+		existingData, app.toUpdate = loadFile(*c.filePath, *c.url)
+	} else {
+		existingData = data.NewData(*c.url)
+	}
+
+	channel, speedChange, err := p.CreateFlexibleChannel(
+		ctx,
+		existingData.URL,
+		ping.NewPingsPerMinute(*c.pingsPerMinute),
+		*c.pingBufferingLimit,
+	)
+	// If Creating the channel has an error this means we cannot continue, the network errors are already
+	// wrapped and retried by this channel, other errors imply some larger problem
+	exit.OnError(err)
+	app.speedChange = speedChange
+	err = application.LoadTheme(*c.theme, app.term)
+	appThemeStartUp()
+	go func() { app.errorChannel <- err }()
+
+	return channel, existingData
+}
+
+func (app *Application) Finish() {
+	_ = app.term.ClearScreen(terminal.UpdateSize)
+	app.term.Print(app.g.LastFrame())
+	if *app.config.filePath != "" {
+		app.term.Print("\n\n# Summary\nData Successfully recorded in file '" + *app.config.filePath + "'\n\t" +
+			app.g.Summarise() + "\n")
+	} else {
+		app.term.Print("\n\n# Summary\nData not saved, use `-file [FILE_NAME]` to save recordings in future.\n\t" +
+			app.g.Summarise() + "\n")
+	}
+}
+
+func appThemeStartUp() {
+	helpStartup()
+	graph.StartUp()
 }
 
 // addListeners will add all the listeners to the application which will be forwarded to the terminal for
@@ -200,57 +252,6 @@ func (app *Application) addListeners(control graph.Presentation, guiSpeedChange 
 		}()
 		return nil
 	})
-}
-
-func appThemeStartUp() {
-	helpStartup()
-	graph.StartUp()
-}
-
-func (app *Application) Init(ctx context.Context, c Config) (<-chan ping.PingResults, *data.Data) {
-	app.config = c
-	app.errorChannel = make(chan error)
-	app.graphControlPlane = make(chan graph.Control)
-	app.GUI = newGUIState()
-	p := ping.NewPing()
-	var err error
-	app.term, err = makeTerminal(c.debuggingTermSize)
-	exit.OnError(err) // If we can't open the terminal for any reason we reasonably can't do anything this program offers.
-
-	var existingData *data.Data
-	if *c.filePath != "" {
-		existingData, app.toUpdate = loadFile(*c.filePath, *c.url)
-	} else {
-		existingData = data.NewData(*c.url)
-	}
-
-	channel, speedChange, err := p.CreateFlexibleChannel(
-		ctx,
-		existingData.URL,
-		ping.NewPingsPerMinute(*c.pingsPerMinute),
-		*c.pingBufferingLimit,
-	)
-	// If Creating the channel has an error this means we cannot continue, the network errors are already
-	// wrapped and retried by this channel, other errors imply some larger problem
-	exit.OnError(err)
-	app.speedChange = speedChange
-	err = application.LoadTheme(*c.theme, app.term)
-	appThemeStartUp()
-	go func() { app.errorChannel <- err }()
-
-	return channel, existingData
-}
-
-func (app *Application) Finish() {
-	_ = app.term.ClearScreen(terminal.UpdateSize)
-	app.term.Print(app.g.LastFrame())
-	if *app.config.filePath != "" {
-		app.term.Print("\n\n# Summary\nData Successfully recorded in file '" + *app.config.filePath + "'\n\t" +
-			app.g.Summarise() + "\n")
-	} else {
-		app.term.Print("\n\n# Summary\nData not saved, use `-file [FILE_NAME]` to save recordings in future.\n\t" +
-			app.g.Summarise() + "\n")
-	}
 }
 
 func (app *Application) writeToFile(ctx context.Context, ourData *data.Data, input <-chan ping.PingResults) {
@@ -339,7 +340,7 @@ func loadFile(file, url string) (*data.Data, *os.File) {
 
 func makeTerminal(termSize *string) (*terminal.Terminal, error) {
 	if termSize != nil && *termSize != "" {
-		s, err := terminal.NewSize(*termSize)
+		s, err := terminal.CreateSize(*termSize)
 		if err != nil {
 			return nil, err
 		}

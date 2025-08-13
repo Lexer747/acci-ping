@@ -7,4 +7,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 # TODO eliminating race conditions from paint buffer would re-enable -race, but first investigate the perf and tradeoffs.
-go run acci-ping.go -debug-error-creator -debug-log dev.log -hide-help -file dev.pings -cpuprofile cpu.prof -memprofile mem.prof -debug-strict
+go run acci-ping.go -debug-error-creator -debug-log dev.log -hide-help -file dev.pings -debug-cpuprofile cpu.prof -debug-memprofile mem.prof -debug-strict

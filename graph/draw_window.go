@@ -63,6 +63,7 @@ const (
 
 type label struct {
 	coords
+
 	symbol      string
 	text        string
 	leftJustify bool
@@ -149,8 +150,6 @@ func (dw *drawWindow) addPoint(
 	isMinWithinSpan := p.Duration == spanStats.Min
 	isMaxWithinSpan := p.Duration == spanStats.Max
 	wideEnough := spanWidth > averageLabelSize
-	// TODO configure this somehow
-	// rng := dw.idx%50 == 100
 	needsLabel := (wideEnough && (isMinWithinSpan || isMaxWithinSpan)) || isMin || isMax
 	dw.add(x, y, needsLabel)
 	if !needsLabel {

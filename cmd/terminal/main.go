@@ -62,7 +62,8 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	if err = t.ClearScreen(terminal.UpdateSize); err != nil {
+	err = t.ClearScreen(terminal.UpdateSize)
+	if err != nil {
 		panic(err.Error())
 	}
 	t.Print("Press 'l' to clear the screen, any other char to print a line, ctrl-c to quit." + ansi.CursorPosition(2, 1))

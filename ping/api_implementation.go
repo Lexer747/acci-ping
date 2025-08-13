@@ -151,7 +151,8 @@ func (p *Ping) pingOnChannel(
 	}
 
 	// Actually write the echo request onto the connection:
-	if err = p.writeEcho(selected, raw); err != nil {
+	err = p.writeEcho(selected, raw)
+	if err != nil {
 		client <- internalErr(selected.ip, timestamp, err)
 		return true
 	}
@@ -233,7 +234,8 @@ func (p *Ping) makeOutgoingPacket(seq uint16) ([]byte, error) {
 }
 
 func (p *Ping) writeEcho(selectedIP *addr, raw []byte) error {
-	if _, err := p.connect.WriteTo(raw, selectedIP.Get()); err != nil {
+	_, err := p.connect.WriteTo(raw, selectedIP.Get())
+	if err != nil {
 		return errors.Wrapf(err, "couldn't write packet to connection %q", p.currentURL)
 	}
 	return nil
@@ -299,8 +301,9 @@ var listenList = []listenerConfig{
 }
 
 type listenerConfig struct {
-	network, address string
 	addressType
+
+	network, address string
 }
 
 type addressType int

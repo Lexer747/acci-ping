@@ -150,14 +150,14 @@ func NewDebuggingTerminal(s Size) (*Terminal, error) {
 // NewParsedFixedSizeTerminal will construct a new fixed size terminal which cannot change size, parsing the
 // size from the input parameter string, which is in format <H>x<W>, where H and W are integers.
 func NewParsedFixedSizeTerminal(size string) (*Terminal, error) {
-	s, err := NewSize(size)
+	s, err := CreateSize(size)
 	if err != nil {
 		return nil, err
 	}
 	return NewFixedSizeTerminal(s)
 }
 
-func NewSize(size string) (Size, error) {
+func CreateSize(size string) (Size, error) {
 	s, ok := ParseSize(size)
 	if !ok {
 		return Size{}, errors.Errorf(
@@ -216,6 +216,7 @@ type Listener struct {
 
 type ConditionalListener struct {
 	Listener
+
 	// Applicable is the applicability of this listen, i.e. for which input runes do you want this action to
 	// be fired
 	Applicable func(rune) bool
@@ -304,7 +305,8 @@ const (
 // terminal is cleared.
 func (t *Terminal) ClearScreen(behaviour ClearBehaviour) error {
 	if behaviour == UpdateSize || behaviour == UpdateSizeAndMoveHome {
-		if err := t.UpdateSize(); err != nil {
+		err := t.UpdateSize()
+		if err != nil {
 			return errors.Wrap(err, "while ClearScreen")
 		}
 	}
@@ -381,7 +383,8 @@ func (t *Terminal) beingListening(ctx context.Context) {
 			if received.err != nil {
 				panic(errors.Wrap(received.err, "unexpected read failure in terminal"))
 			}
-			if err := t.UpdateSize(); err != nil {
+			err := t.UpdateSize()
+			if err != nil {
 				panic(errors.Wrap(err, "unexpected read failure in terminal"))
 			}
 			if received.n <= 0 {

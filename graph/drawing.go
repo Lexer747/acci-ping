@@ -60,8 +60,7 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 	count := g.data.LockFreeTotalCount()
 	spinnerValue := ""
 	if cfg.drawSpinner {
-		g.lastFrame.spinnerIndex++
-		spinnerValue = spinner(s, g.lastFrame.spinnerIndex, cfg.timeBetweenFrames)
+		spinnerValue = g.lastFrame.spinnerData.spinner(s)
 		g.drawingBuffer.Get(draw.SpinnerIndex).Reset()
 		g.drawingBuffer.Get(draw.SpinnerIndex).WriteString(spinnerValue)
 	}
@@ -118,7 +117,7 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 		PacketCount:       count,
 		yAxis:             y,
 		xAxis:             x,
-		spinnerIndex:      g.lastFrame.spinnerIndex,
+		spinnerData:       g.lastFrame.spinnerData,
 		framePainter:      paintFrame,
 		framePainterNoGui: noGUI,
 		cfg:               cfg,
@@ -147,6 +146,7 @@ func (g *Graph) checkGUI() func(io.Writer) error {
 	} else if state.ShouldInvalidate() {
 		return func(w io.Writer) error {
 			defer g.ui.Drawn(state)
+			// this doesn't invalidate properly because the graph is transparent.
 			return errors.Join(
 				onlyGUI(g.drawingBuffer)(w),
 				g.lastFrame.framePainterNoGui(w),

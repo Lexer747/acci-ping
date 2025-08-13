@@ -98,7 +98,8 @@ func cssStrToRGB(s string) (uint8, uint8, uint8, error) {
 	if b > 255 || b < 0 {
 		berr = errors.Join(berr, errors.Errorf("green component out of range %d, should be within 0 and 255", b))
 	}
-	if err := errors.Join(rerr, gerr, berr); err != nil {
+	err := errors.Join(rerr, gerr, berr)
+	if err != nil {
 		return 0, 0, 0, errors.Wrapf(err, "Couldn't parse RGB values for %q", s)
 	}
 	// G115: These are not an integer overflow because we bounds check above ^

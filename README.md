@@ -38,12 +38,12 @@ program via the normal control-c.
         binds the [e] key to create errors for GUI verification
 * `-debug-strict`
         enables more strict operation in which warnings turn into crashes.
-* `debug-term-size`
+* `-debug-term-size`
         disables raw mode and greatly simplifies terminal integration by forcing a fixed size, not recommended
         for use at all.
-* `-cpuprofile [file]`
+* `-debug-cpuprofile [file]`
         write cpu profile to file
-* `-memprofile [file]`
+* `-debug-memprofile [file]`
         write memory profile to file
 
 </details>

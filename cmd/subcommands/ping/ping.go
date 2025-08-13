@@ -17,10 +17,10 @@ import (
 )
 
 type Config struct {
+	*flag.FlagSet
+
 	url   *string
 	count *int
-
-	*flag.FlagSet
 }
 
 func GetFlags() *Config {

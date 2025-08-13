@@ -29,6 +29,9 @@ import (
 )
 
 type Config struct {
+	*application.BuildInfo
+	*flag.FlagSet
+
 	cpuprofile  *string
 	debugFollow *bool
 	debugStrict *bool
@@ -38,20 +41,17 @@ type Config struct {
 	termSize    *string
 	theme       *string
 	yAxisScale  *bool
-
-	*application.BuildInfo
-	*flag.FlagSet
 }
 
 func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
 	ret := &Config{
 		BuildInfo:   info,
-		cpuprofile:  f.String("cpuprofile", "", "write cpu profile to `file`"),
+		cpuprofile:  f.String("debug-cpuprofile", "", "write cpu profile to `file`"),
 		debugStrict: f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
 		debugFollow: f.Bool("debug-follow", false, "switches drawing to followLastSpan."),
 		logFile:     f.String("l", "", "write logs to `file`. (default no logs written)"),
-		memprofile:  f.String("memprofile", "", "write memory profile to `file`"),
+		memprofile:  f.String("debug-memprofile", "", "write memory profile to `file`"),
 		termSize: f.String("term-size", "", "controls the terminal size and fixes it to the input,"+
 			" input is in the form \"<H>x<W>\" e.g. 20x80. H and W must be integers - where H == height, and W == width of the terminal."),
 		theme: f.String("theme", "", "the colour theme (either a path or builtin theme name) to use for the program,\n"+
@@ -141,12 +141,19 @@ func do(path string, term *terminal.Terminal, profiling, logScale, debugFollow, 
 		panic(err.Error())
 	}
 
+	scale := graph.Linear
+	if logScale {
+		scale = graph.Logarithmic
+	}
+	g := makeGraph(term, debugFollow, scale, debugStrict, d)
+
 	// TODO dont profile like this when iterating over a folder of inputs.
 	if profiling {
-		timer := time.NewTimer(time.Second * 60)
+		timer := time.NewTimer(time.Second * 30)
 		running := true
 		for running {
-			printGraph(term, d, logScale, debugFollow, debugStrict)
+			printGraph(term, g, debugFollow, debugStrict)
+			g.ClearForPerfTest()
 			select {
 			case <-timer.C:
 				running = false
@@ -154,7 +161,7 @@ func do(path string, term *terminal.Terminal, profiling, logScale, debugFollow, 
 			}
 		}
 	} else {
-		printGraph(term, d, logScale, debugFollow, debugStrict)
+		printGraph(term, g, debugFollow, debugStrict)
 	}
 }
 
@@ -166,11 +173,14 @@ func makeTerminal(termSize *string) (*terminal.Terminal, error) {
 	}
 }
 
-func printGraph(term *terminal.Terminal, d *data.Data, logScale, debugFollow, debugStrict bool) {
-	scale := graph.Linear
-	if logScale {
-		scale = graph.Logarithmic
+func printGraph(term *terminal.Terminal, g *graph.Graph, debugFollow, debugStrict bool) {
+	err := g.OneFrame()
+	if err != nil {
+		panic(err.Error())
 	}
+}
+
+func makeGraph(term *terminal.Terminal, debugFollow bool, scale graph.YAxisScale, debugStrict bool, d *data.Data) *graph.Graph {
 	g := graph.NewGraph(
 		context.Background(),
 		graph.GraphConfiguration{
@@ -184,9 +194,5 @@ func printGraph(term *terminal.Terminal, d *data.Data, logScale, debugFollow, de
 			Data:        d,
 		},
 	)
-	fmt.Println()
-	err := g.OneFrame()
-	if err != nil {
-		panic(err.Error())
-	}
+	return g
 }

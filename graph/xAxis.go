@@ -40,6 +40,7 @@ type drawingXAxis struct {
 
 type xAxisIter struct {
 	*drawingXAxis
+
 	spanIndex int
 }
 

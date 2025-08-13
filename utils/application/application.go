@@ -88,9 +88,7 @@ func InitLogging(file string, info *BuildInfo) (toDefer func()) {
 		}
 	}
 	// If no file is specified we want to stop all logging
-	h := slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-		Level: slog.LevelError,
-	})
+	h := slog.DiscardHandler
 	slog.SetDefault(slog.New(h))
 	return func() {}
 }
@@ -134,7 +132,8 @@ func InitMemProfile(memprofile string) (toDefer func()) {
 		_, err = f.Write([]byte{})
 		check.NoErr(err, "could not truncate memory profile")
 		runtime.GC() // get up-to-date statistics
-		if err := pprof.WriteHeapProfile(f); err != nil {
+		err = pprof.WriteHeapProfile(f)
+		if err != nil {
 			check.NoErr(err, "could not write memory profile")
 		}
 	}

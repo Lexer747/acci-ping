@@ -173,6 +173,7 @@ func (cj *colourJSON) unmarshalMoreBits(s string) error {
 
 type bit24JSON struct {
 	*string
+
 	R *uint8 `json:"r"`
 	G *uint8 `json:"g"`
 	B *uint8 `json:"b"`
@@ -289,7 +290,8 @@ func (tj themeJSON) Theme() (Theme, error) {
 	errs = append(errs, errors.Wrap(err, "negative"))
 	darkNegative, err := tj.Colours.DarkNegative.impl()
 	errs = append(errs, errors.Wrap(err, "dark-negative"))
-	if err := errors.Join(errs...); err != nil {
+	err = errors.Join(errs...)
+	if err != nil {
 		return Theme{}, errors.Wrap(err, "Couldn't parse theme, colours had errors")
 	}
 	return Theme{

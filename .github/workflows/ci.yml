@@ -45,7 +45,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7.0.0
         with:
-          version: v2.0.2
+          version: v2.4.0
           verify: false
           # This linter works based on the file modification when running under github actions because it's
           # not given full access to the git history and therefore gets the wrong date for all files.

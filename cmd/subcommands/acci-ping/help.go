@@ -108,5 +108,4 @@ func helpStartup() {
 	)
 }
 
-// TODO generate this size?
-var helpCopy = make([]gui.Typography, 0, 9)
+var helpCopy = make([]gui.Typography, 0, 16)

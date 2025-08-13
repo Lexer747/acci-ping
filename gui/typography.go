@@ -27,6 +27,13 @@ type Typography struct {
 	Alignment      HorizontalAlignment
 }
 
+func (t Typography) Len() int {
+	if t.LenFromToPrint {
+		return len(t.ToPrint)
+	}
+	return t.TextLen
+}
+
 func (t Typography) init(maxTextLength int) initialisedTypography {
 	return initialisedTypography{
 		Typography:    t,
@@ -36,14 +43,8 @@ func (t Typography) init(maxTextLength int) initialisedTypography {
 
 type initialisedTypography struct {
 	Typography
-	maxTextLength int
-}
 
-func (t Typography) Len() int {
-	if t.LenFromToPrint {
-		return len(t.ToPrint)
-	}
-	return t.TextLen
+	maxTextLength int
 }
 
 func (t initialisedTypography) Draw(size terminal.Size, b *bytes.Buffer) {

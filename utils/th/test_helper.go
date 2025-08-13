@@ -119,7 +119,7 @@ func EmulateTerminal(ansiText string, buffer []string, size terminal.Size, termi
 			a.changeCursor(a.cursorColumn+1, a.cursorRow)
 		}
 		a.consume()
-		if a.EoF() {
+		if a._EoF() {
 			break
 		}
 	}
@@ -188,7 +188,7 @@ func (a *ansiState) consumeDigits() int {
 	return int(parsed)
 }
 
-func (a *ansiState) EoF() bool {
+func (a *ansiState) _EoF() bool {
 	return a.head >= len(a.asRunes)
 }
 

@@ -30,7 +30,8 @@ func LoadFile(path string) (*data.Data, *os.File, error) {
 		f.Close()
 		return nil, nil, err
 	}
-	if _, err = existingData.FromCompact(fromFile); err != nil {
+	_, err = existingData.FromCompact(fromFile)
+	if err != nil {
 		f.Close()
 		return nil, nil, err
 	}

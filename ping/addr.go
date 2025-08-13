@@ -16,7 +16,6 @@ type addr struct {
 }
 
 func New(addrType addressType, ip net.IP) *addr {
-	// TODO Port?
 	switch addrType {
 	case _IP4, _IP6:
 		return &addr{ip: ip, asIP: &net.IPAddr{IP: ip}}

@@ -108,7 +108,7 @@ func NewGraph(ctx context.Context, cfg GraphConfiguration) *Graph {
 		initial:        cfg.PingsPerMinute,
 		data:           graphdata.NewGraphData(cfg.Data),
 		frameMutex:     &sync.Mutex{},
-		lastFrame:      frame{},
+		lastFrame:      frame{spinnerData: spinner{timestampLastDrawn: time.Now()}},
 		drawingBuffer:  cfg.DrawingBuffer,
 		ui:             cfg.Gui,
 		debugStrict:    cfg.DebugStrict,
@@ -157,7 +157,8 @@ func (g *Graph) Run(
 			case <-ctx.Done():
 				return context.Cause(ctx)
 			case <-frameRate.C:
-				if err = g.Term.UpdateSize(); err != nil {
+				err = g.Term.UpdateSize()
+				if err != nil {
 					return err
 				}
 				if size != g.Term.GetSize() {
@@ -188,10 +189,12 @@ func (g *Graph) Run(
 
 // OneFrame doesn't run the graph but runs all the code to create and print a single frame to the terminal.
 func (g *Graph) OneFrame() error {
-	if err := g.Term.ClearScreen(terminal.MoveHome); err != nil {
+	err := g.Term.ClearScreen(terminal.MoveHome)
+	if err != nil {
 		return err
 	}
-	if err := g.Term.UpdateSize(); err != nil {
+	err = g.Term.UpdateSize()
+	if err != nil {
 		return err
 	}
 	g.presentation.m.Lock()
@@ -221,6 +224,13 @@ func (g *Graph) Summarise() string {
 	return strings.ReplaceAll(g.data.Summary(), "| ", "\n\t")
 }
 
+func (g *Graph) ClearForPerfTest() {
+	g.presentation.m.Lock()
+	defer g.presentation.m.Unlock()
+	g.lastFrame = frame{spinnerData: spinner{timestampLastDrawn: time.Now()}}
+	g.drawingBuffer = draw.NewPaintBuffer()
+}
+
 func (g *Graph) sink(ctx context.Context) {
 	for {
 		select {
@@ -229,7 +239,7 @@ func (g *Graph) sink(ctx context.Context) {
 			return
 		case p, ok := <-g.dataChannel:
 			// TODO configure logging channels
-			slog.Debug("graph sink, data received", "packet", p)
+			// slog.Debug("graph sink, data received", "packet", p)
 			if !ok {
 				g.sinkAlive = false
 				return
@@ -283,7 +293,7 @@ type frame struct {
 	xAxis             drawingXAxis
 	framePainter      func(io.Writer) error
 	framePainterNoGui func(io.Writer) error
-	spinnerIndex      int
+	spinnerData       spinner
 	cfg               computeFrameConfig
 }
 
@@ -298,5 +308,6 @@ func (f frame) Size() terminal.Size {
 
 type controlState struct {
 	Presentation
+
 	m *sync.Mutex
 }

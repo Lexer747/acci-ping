@@ -32,6 +32,46 @@ type queryCache struct {
 	maxDrops uint
 }
 
+// GetLastIP will return the last IP address this cache used, formatted according to [net.IP.String].
+func (q *queryCache) GetLastIP() string {
+	q.m.Lock()
+	defer q.m.Unlock()
+	if len(q.store) > 0 {
+		return q.store[q.index].addr.String()
+	}
+	return "<no ip>"
+}
+
+// Get will return an IP for use which is not considered stale and true. If the cache is exhausted an all IPs
+// are stale then it will return nil and false.
+func (q *queryCache) Get() (*addr, bool) {
+	q.m.Lock()
+	defer q.m.Unlock()
+	return q.getLockFree()
+}
+
+// Dropped tells this cache that the passed IP dropped a packet. Once enough drops have occurred for a given
+// IP in the cache then the cache will consider that IP stale. Panic's if the IP isn't in the cache.
+func (q *queryCache) Dropped(addr *addr) {
+	q.m.Lock()
+	defer q.m.Unlock()
+	// We could keep the cache sorted and use binary searches, but for now we consider this a cold path and so
+	// do not optimise for it.
+	index := slices.IndexFunc(q.store, func(q queryCacheItem) bool {
+		return q.addr.Equal(addr.ip)
+	})
+	check.Check(index != -1, "Unknown IP")
+
+	// Now perform the update
+	cur := q.store[index]
+	stale := cur.dropCount > q.maxDrops
+	q.store[q.index] = queryCacheItem{
+		addr:      cur.addr,
+		stale:     stale,
+		dropCount: cur.dropCount + 1,
+	}
+}
+
 func (q *queryCache) reset() {
 	q.index = 0
 }
@@ -66,24 +106,6 @@ func (q *queryCache) socketedLockFree(addrType addressType) {
 	q.store = results
 }
 
-// GetLastIP will return the last IP address this cache used, formatted according to [net.IP.String].
-func (q *queryCache) GetLastIP() string {
-	q.m.Lock()
-	defer q.m.Unlock()
-	if len(q.store) > 0 {
-		return q.store[q.index].addr.String()
-	}
-	return "<no ip>"
-}
-
-// Get will return an IP for use which is not considered stale and true. If the cache is exhausted an all IPs
-// are stale then it will return nil and false.
-func (q *queryCache) Get() (*addr, bool) {
-	q.m.Lock()
-	defer q.m.Unlock()
-	return q.getLockFree()
-}
-
 func (q *queryCache) getLockFree() (*addr, bool) {
 	if len(q.store) == 0 {
 		// store is empty
@@ -105,28 +127,6 @@ func (q *queryCache) getLockFree() (*addr, bool) {
 	}
 	// No non-stale IPs found
 	return nil, false
-}
-
-// Dropped tells this cache that the passed IP dropped a packet. Once enough drops have occurred for a given
-// IP in the cache then the cache will consider that IP stale. Panic's if the IP isn't in the cache.
-func (q *queryCache) Dropped(addr *addr) {
-	q.m.Lock()
-	defer q.m.Unlock()
-	// We could keep the cache sorted and use binary searches, but for now we consider this a cold path and so
-	// do not optimise for it.
-	index := slices.IndexFunc(q.store, func(q queryCacheItem) bool {
-		return q.addr.Equal(addr.ip)
-	})
-	check.Check(index != -1, "Unknown IP")
-
-	// Now perform the update
-	cur := q.store[index]
-	stale := cur.dropCount > q.maxDrops
-	q.store[q.index] = queryCacheItem{
-		addr:      cur.addr,
-		stale:     stale,
-		dropCount: cur.dropCount + 1,
-	}
 }
 
 func (q *queryCache) advance() {
@@ -242,7 +242,8 @@ HARD_RETRY:
 		// Now is also a sane point in the function to determine if the parent wants us to stop spinning our
 		// hamster wheel trying to find a packet. We only check this so we gracefully exit instead of spamming
 		// DNS queries as we die.
-		if err := ctx.Err(); err != nil {
+		err := ctx.Err()
+		if err != nil {
 			return nil, nil
 		}
 	}
@@ -259,7 +260,8 @@ HARD_RETRY:
 		// Now is a sane point in the function to determine if the parent wants us to stop spinning our
 		// hamster wheel trying to find a packet. Overly checking this value is wasteful and unhelpful, we
 		// expect the ratelimited loop to do that the majority of the time.
-		if err := ctx.Err(); err != nil {
+		err := ctx.Err()
+		if err != nil {
 			return nil, nil
 		}
 		goto HARD_RETRY

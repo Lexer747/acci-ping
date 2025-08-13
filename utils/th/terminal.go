@@ -18,6 +18,14 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+type TestFile struct {
+	fileName   string
+	m          *sync.Mutex
+	buffer     []byte
+	readIndex  atomic.Int64
+	writeIndex atomic.Int64
+}
+
 func NewTestTerminal() (
 	*TestFile,
 	*TestFile,
@@ -42,14 +50,6 @@ func NewTestTerminal() (
 		_ = t.UpdateSize()
 	}
 	return stdin, stdout, t, setTermSize, err
-}
-
-type TestFile struct {
-	fileName   string
-	m          *sync.Mutex
-	buffer     []byte
-	readIndex  atomic.Int64
-	writeIndex atomic.Int64
 }
 
 func newTestFile(name string) *TestFile {

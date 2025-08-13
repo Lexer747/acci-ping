@@ -89,23 +89,20 @@ func (d *Data) IsLast(index int64) bool {
 	return d.End(index - 1)
 }
 
-func (d *Data) addBlock() {
-	d.Blocks = append(d.Blocks, &Block{
-		Header: &Header{Stats: &Stats{}, TimeSpan: &TimeSpan{}},
-		Raw:    make([]ping.PingDataPoint, 0, 1024),
-	})
-}
-
-func (d *Data) getBlock(blockIndex int) *Block {
-	return d.Blocks[blockIndex]
-}
-
 func (d *Data) String() string {
 	return fmt.Sprintf("%s: PingsMeta#%d [%s] | %s | %s", d.URL, d.PingsMeta, d.Network.String(), d.Header.String(), d.Runs.String())
 }
 
 func (d *Data) Summary() string {
-	return fmt.Sprintf("%s: PingsMeta#%d [%s] | %s | %s", d.URL, d.PingsMeta, d.Network.String(), d.Header.Summary(), d.Runs.String())
+	getTimestamp := func(i int64) time.Time { return d.Get(i).Timestamp }
+	return fmt.Sprintf(
+		"%s: PingsMeta#%d [%s] | %s | %s",
+		d.URL,
+		d.PingsMeta,
+		d.Network.String(),
+		d.Header.Summary(),
+		d.Runs.Summary(getTimestamp),
+	)
 }
 
 func (d *Data) In(tz *time.Location) *Data {
@@ -116,6 +113,17 @@ func (d *Data) In(tz *time.Location) *Data {
 		ret.AddPoint(p)
 	}
 	return ret
+}
+
+func (d *Data) addBlock() {
+	d.Blocks = append(d.Blocks, &Block{
+		Header: &Header{Stats: &Stats{}, TimeSpan: &TimeSpan{}},
+		Raw:    make([]ping.PingDataPoint, 0, 1024),
+	})
+}
+
+func (d *Data) getBlock(blockIndex int) *Block {
+	return d.Blocks[blockIndex]
 }
 
 // TimeSpan is the time properties of a given thing
@@ -321,6 +329,34 @@ func (r *Runs) String() string {
 		return fmt.Sprintf("Longest Streak %d | Longest Drop Streak %d", r.GoodPackets.Longest, r.DroppedPackets.Longest)
 	}
 }
+func (r *Runs) Summary(getTimestamp func(int64) time.Time) string {
+	if r.GoodPackets.Longest == 0 && r.DroppedPackets.Longest == 0 {
+		return ""
+	}
+
+	goodStreak := r.GoodPackets.withTimestamp("Longest Streak", getTimestamp)
+	dropStreak := r.DroppedPackets.withTimestamp("Longest Drop Streak", getTimestamp)
+	switch {
+	case r.GoodPackets.Longest == 0:
+		return dropStreak
+	case r.DroppedPackets.Longest == 0:
+		return goodStreak
+	default:
+		return fmt.Sprintf("%s | %s", goodStreak, dropStreak)
+	}
+}
+
+func (r *Run) withTimestamp(str string, getTimestamp func(int64) time.Time) string {
+	end := getTimestamp(r.LongestIndexEnd)
+	// G115 the input for longest comes from int64 indexes anyway
+	begin := getTimestamp(r.LongestIndexEnd - int64(r.Longest-1)) //nolint:gosec
+	span := TimeSpan{
+		Begin:    begin,
+		End:      end,
+		Duration: 0,
+	}
+	return fmt.Sprintf("%s %d %s", str, r.Longest, span.String())
+}
 
 type Block struct {
 	Header *Header
@@ -373,22 +409,6 @@ func (s *Stats) Merge(other *Stats) *Stats {
 	return ret
 }
 
-// Math proof for why this works:
-// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
-//
-// This will compute the variance and update this [Stats] pointer with the variance and standard
-// deviation based on the current sumOfSquares.
-func (s *Stats) computeVariance() {
-	variance := 0.0
-	std := 0.0
-	if s.GoodCount >= 2 {
-		variance = s.sumOfSquares / float64(s.GoodCount-1)
-		std = math.Sqrt(variance)
-	}
-	s.Variance = variance
-	s.StandardDeviation = std
-}
-
 func (s *Stats) PacketLoss() float64 {
 	return float64(s.PacketsDropped) / float64(s.GoodCount+s.PacketsDropped)
 }
@@ -397,8 +417,9 @@ func (s *Stats) AddDroppedPacket() {
 	s.PacketsDropped++
 }
 
-// TODO float imprecision
-// TODO https://en.wikipedia.org/wiki/Kahan_summation_algorithm
+// TODO write a blog about how this is actually the best we know about, there's not an algorithm which does
+// better... pretty cool.
+//
 // Math proof for why this works:
 // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
 func (s *Stats) AddPoint(input time.Duration) {
@@ -420,8 +441,6 @@ func (s *Stats) AddPoint(input time.Duration) {
 }
 
 func (s *Stats) AddPoints(values []time.Duration) {
-	// TODO use one pass variance
-	// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Weighted_incremental_algorithm
 	for _, v := range values {
 		s.AddPoint(v)
 	}
@@ -454,6 +473,22 @@ func (s *Stats) PickString(remainingSpace int) string {
 
 func (s *Stats) String() string {
 	return s.mediumString()
+}
+
+// Math proof for why this works:
+// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+//
+// This will compute the variance and update this [Stats] pointer with the variance and standard
+// deviation based on the current sumOfSquares.
+func (s *Stats) computeVariance() {
+	variance := 0.0
+	std := 0.0
+	if s.GoodCount >= 2 {
+		variance = s.sumOfSquares / float64(s.GoodCount-1)
+		std = math.Sqrt(variance)
+	}
+	s.Variance = variance
+	s.StandardDeviation = std
 }
 
 func (s *Stats) packetLoss(b *strings.Builder, prefix string) {

@@ -42,15 +42,6 @@ func NewGraphData(d *data.Data) *GraphData {
 	return g
 }
 
-func (gd *GraphData) addPointToSpans(p ping.PingDataPoint, index int64) {
-	differentSpan := gd.spans[gd.spanIndex].AddPoint(p, index)
-	if differentSpan {
-		gd.spans = append(gd.spans, NewSpanInfo())
-		gd.spanIndex++
-		gd.spans[gd.spanIndex].AddPoint(p, index)
-	}
-}
-
 func (gd *GraphData) AddPoint(p ping.PingResults) {
 	gd.Lock()
 	defer gd.Unlock()
@@ -95,6 +86,49 @@ func (gd *GraphData) LockFreeURL() string          { return gd.data.URL }
 func (gd *GraphData) LockFreeRuns() *data.Runs     { return gd.data.Runs }
 func (gd *GraphData) LockFreeSpanInfos() Spans     { return gd.spans }
 
+func (gd *GraphData) LockFreeIter(followLatestSpan bool) *Iter {
+	offset := int64(0)
+	total := gd.LockFreeTotalCount()
+	if followLatestSpan {
+		spans := gd.LockFreeSpanInfos()
+		lastIndex := len(spans) - 1
+		spansExceptLast := spans[:lastIndex]
+		offset = int64(spansExceptLast.Count())
+		lastSpan := spans[lastIndex]
+		total = int64(lastSpan.Count)
+	}
+	return &Iter{
+		Total:  total,
+		d:      gd.data,
+		spans:  gd.LockFreeSpanInfos(),
+		offset: offset,
+	}
+}
+
+type Iter struct {
+	Total  int64
+	d      *data.Data
+	spans  Spans
+	offset int64
+}
+
+func (i *Iter) Get(index int64) ping.PingDataPoint {
+	return i.d.Get(index + i.offset)
+}
+
+func (i *Iter) IsLast(index int64) bool {
+	return i.d.IsLast(index)
+}
+
+func (gd *GraphData) addPointToSpans(p ping.PingDataPoint, index int64) {
+	differentSpan := gd.spans[gd.spanIndex].AddPoint(p, index)
+	if differentSpan {
+		gd.spans = append(gd.spans, NewSpanInfo())
+		gd.spanIndex++
+		gd.spans[gd.spanIndex].AddPoint(p, index)
+	}
+}
+
 type SpanInfo struct {
 	// SpanStats is the data about gaps between ping's, not the ping durations themselves.
 	SpanStats *data.Stats
@@ -113,37 +147,6 @@ func NewSpanInfo() *SpanInfo {
 		TimeSpan:  &data.TimeSpan{},
 		LastPoint: ping.PingDataPoint{},
 	}
-}
-
-const allowedStandardDeviations = 4.0
-const allowedDroppedStandardDeviations = 9.0
-const allowedMeanWhenTwoPoints = 7.0
-
-func (si *SpanInfo) addFirstPoint(p ping.PingDataPoint, index int64) {
-	si.TimeSpan = &data.TimeSpan{Begin: p.Timestamp, End: p.Timestamp}
-	if p.Dropped() {
-		si.PingStats.AddDroppedPacket()
-	} else {
-		si.PingStats.AddPoint(p.Duration)
-	}
-	si.Count++
-	si.LastPoint = p
-	si.start = index
-	si.end = index
-}
-
-func (si *SpanInfo) add(p ping.PingDataPoint, index int64) {
-	gap := p.Timestamp.Sub(si.LastPoint.Timestamp)
-	si.SpanStats.AddPoint(gap)
-	if p.Dropped() {
-		si.PingStats.AddDroppedPacket()
-	} else {
-		si.PingStats.AddPoint(p.Duration)
-	}
-	si.TimeSpan.AddTimestamp(p.Timestamp)
-	si.Count++
-	si.LastPoint = p
-	si.end = index
 }
 
 func (si *SpanInfo) AddPoint(p ping.PingDataPoint, index int64) bool {
@@ -237,6 +240,37 @@ func (si *SpanInfo) AddPoint(p ping.PingDataPoint, index int64) bool {
 	}
 }
 
+const allowedStandardDeviations = 4.0
+const allowedDroppedStandardDeviations = 9.0
+const allowedMeanWhenTwoPoints = 7.0
+
+func (si *SpanInfo) addFirstPoint(p ping.PingDataPoint, index int64) {
+	si.TimeSpan = &data.TimeSpan{Begin: p.Timestamp, End: p.Timestamp}
+	if p.Dropped() {
+		si.PingStats.AddDroppedPacket()
+	} else {
+		si.PingStats.AddPoint(p.Duration)
+	}
+	si.Count++
+	si.LastPoint = p
+	si.start = index
+	si.end = index
+}
+
+func (si *SpanInfo) add(p ping.PingDataPoint, index int64) {
+	gap := p.Timestamp.Sub(si.LastPoint.Timestamp)
+	si.SpanStats.AddPoint(gap)
+	if p.Dropped() {
+		si.PingStats.AddDroppedPacket()
+	} else {
+		si.PingStats.AddPoint(p.Duration)
+	}
+	si.TimeSpan.AddTimestamp(p.Timestamp)
+	si.Count++
+	si.LastPoint = p
+	si.end = index
+}
+
 type Spans []*SpanInfo
 
 func (s Spans) Count() int {
@@ -245,38 +279,4 @@ func (s Spans) Count() int {
 		count += span.Count
 	}
 	return count
-}
-
-type Iter struct {
-	Total  int64
-	d      *data.Data
-	spans  Spans
-	offset int64
-}
-
-func (gd *GraphData) LockFreeIter(followLatestSpan bool) *Iter {
-	offset := int64(0)
-	total := gd.LockFreeTotalCount()
-	if followLatestSpan {
-		spans := gd.LockFreeSpanInfos()
-		lastIndex := len(spans) - 1
-		spansExceptLast := spans[:lastIndex]
-		offset = int64(spansExceptLast.Count())
-		lastSpan := spans[lastIndex]
-		total = int64(lastSpan.Count)
-	}
-	return &Iter{
-		Total:  total,
-		d:      gd.data,
-		spans:  gd.LockFreeSpanInfos(),
-		offset: offset,
-	}
-}
-
-func (i *Iter) Get(index int64) ping.PingDataPoint {
-	return i.d.Get(index + i.offset)
-}
-
-func (i *Iter) IsLast(index int64) bool {
-	return i.d.IsLast(index)
 }

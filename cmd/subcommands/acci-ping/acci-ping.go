@@ -21,6 +21,9 @@ import (
 )
 
 type Config struct {
+	*application.BuildInfo
+	*flag.FlagSet
+
 	cpuprofile         *string
 	debugStrict        *bool
 	filePath           *string
@@ -34,21 +37,18 @@ type Config struct {
 	testErrorListener  *bool
 	theme              *string
 	url                *string
-
-	*application.BuildInfo
-	*flag.FlagSet
 }
 
 func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
 	ret := &Config{
 		BuildInfo:          info,
-		cpuprofile:         f.String("cpuprofile", "", "write cpu profile to `file`"),
+		cpuprofile:         f.String("debug-cpuprofile", "", "write cpu profile to `file`"),
 		debugStrict:        f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
 		filePath:           f.String("file", "", "the file to write the pings into. (default data not saved)"),
 		hideHelpOnStart:    f.Bool("hide-help", false, "if this flag is used the help box will be hidden by default"),
 		logFile:            f.String("debug-log", "", "write logs to `file`. (default no logs written)"),
-		memprofile:         f.String("memprofile", "", "write memory profile to `file`"),
+		memprofile:         f.String("debug-memprofile", "", "write memory profile to `file`"),
 		pingBufferingLimit: new(int),
 		pingsPerMinute: f.Float64("pings-per-minute", 60.0,
 			"sets the speed at which the program will try to get new ping results, 0 represents no limit.\n"+

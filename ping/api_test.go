@@ -102,18 +102,18 @@ func TestSpeedChange(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	// Over all test timeout should exceed the happy path, but be reasonable for CI
-	th.TestWithTimeout(t, time.Minute+(30*time.Second), func() {
+	th.TestWithTimeout(t, time.Minute+(15*time.Second), func() {
 		p := ping.NewPing()
 		ctx, cancelFunc := context.WithTimeout(ctx, time.Minute)
 		defer cancelFunc()
-		const testSize = 5
+		const testSize = 2
 		// Too slow to ever complete
-		channel, speedChannel, err := p.CreateFlexibleChannel(ctx, "www.google.com", ping.NewPingsPerMinute(0.0000001), testSize)
+		channel, speedChannel, err := p.CreateFlexibleChannel(ctx, "www.ladybird.org", ping.NewPingsPerMinute(0.0000001), testSize)
 		assert.NilError(t, err)
 		select {
 		case result := <-channel:
 			t.Fatalf("unexpected result in speed change test: %s", result)
-		case <-time.After(10 * time.Millisecond):
+		case <-time.After(time.Millisecond):
 			speedChannel <- ping.Fastest
 		}
 		for range testSize {

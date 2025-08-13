@@ -18,10 +18,10 @@ import (
 )
 
 type Config struct {
+	*flag.FlagSet
+
 	printAll *bool
 	toCSV    *bool
-
-	*flag.FlagSet
 }
 
 func GetFlags() *Config {

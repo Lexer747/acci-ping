@@ -34,10 +34,6 @@ type Ping struct {
 	addresses *queryCache
 }
 
-func (p *Ping) LastIP() string {
-	return p.addresses.GetLastIP()
-}
-
 // NewPing constructs a new Ping client which can perform accurate ping measurements. Either with
 // [Ping.OneShot] or [Ping.CreateChannel], [Ping.OneShot] is best if a long lived client is undesired and will
 // simply block while a single ping is sent to the given URL. [Ping.CreateChannel] creates a go channel which
@@ -60,6 +56,10 @@ func NewPing() *Ping {
 		id:        seed,
 		addresses: &queryCache{m: &sync.Mutex{}, maxDrops: 3},
 	}
+}
+
+func (p *Ping) LastIP() string {
+	return p.addresses.GetLastIP()
 }
 
 // OneShot returns the time take for a ping to be replied too, or error if something went wrong.
@@ -91,7 +91,8 @@ func (p *Ping) OneShot(url string) (time.Duration, error) {
 	}
 
 	// Actually write the echo request onto the connection:
-	if err = p.writeEcho(selectedIP, raw); err != nil {
+	err = p.writeEcho(selectedIP, raw)
+	if err != nil {
 		return 0, err
 	}
 	begin := time.Now()

@@ -214,6 +214,8 @@ type DataTestCase struct {
 	ExpectedTotalCount int
 	ExpectedRuns       data.Runs
 	BlockTest          *BlockTest
+
+	ExpectedSummary string
 }
 
 // A fixed time stamp to make all testing relative too
@@ -248,6 +250,8 @@ func TestData(t *testing.T) {
 				Current:         5,
 			}},
 			ExpectedTotalCount: 5,
+			//nolint:lll
+			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2] | 01 Jan 2000 00:00:00 -> 00:04:00 (4m0s) | Average μ 5.2ms | SD σ 1.483239ms | Dropped 0 | Good Packets 5 | Packet Count 5 | Longest Streak 5 01 Jan 2000 00:00:00 -> 00:04:00 (0s)",
 		},
 		{
 			Values: slices.Concat(
@@ -314,6 +318,8 @@ func TestData(t *testing.T) {
 				Current:         10,
 			}},
 			ExpectedTotalCount: 10,
+			//nolint:lll
+			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2,255.255.255.255] | 01 Jan 2000 00:00:00 -> 00:00:00 (9ns) | Average μ 5ns | SD σ 1ns | Dropped 0 | Good Packets 10 | Packet Count 10 | Longest Streak 10 01 Jan 2000 00:00:00 -> 00:00:00 (0s)",
 		},
 		{
 			Values: sameIP([]ping.PingDataPoint{
@@ -356,6 +362,8 @@ func TestData(t *testing.T) {
 				Longest:         1,
 				Current:         0,
 			}},
+			//nolint:lll
+			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2] | 01 Jan 2000 00:00:00 -> 00:40:00 (40m0s) | Average μ 15.25ms | SD σ 1.707825ms | PacketLoss 20.0% | Dropped 1 | Good Packets 4 | Packet Count 5 | Longest Streak 2 01 Jan 2000 00:00:00 -> 00:10:00 (0s) | Longest Drop Streak 1 01 Jan 2000 00:20:00 -> 00:20:00 (0s)",
 		},
 	}
 
@@ -365,17 +373,18 @@ func TestData(t *testing.T) {
 		}), ",")
 		t.Run(fmt.Sprintf("%d:[%s]", i, sliceAsStr), func(t *testing.T) {
 			t.Parallel()
-			graphData := data.NewData("www.google.com")
+			pingData := data.NewData("www.google.com")
 			for _, v := range test.Values {
-				graphData.AddPoint(v)
+				pingData.AddPoint(v)
 			}
-			assertStatsEqual(t, test.ExpectedGraphStats, *graphData.Header.Stats, 3, "global graph header")
-			assertTimeSpanEqual(t, test.ExpectedGraphSpan, *graphData.Header.TimeSpan, "global graph header")
-			th.AssertFloatEqual(t, test.ExpectedPacketLoss, graphData.Header.Stats.PacketLoss(), 5, "global packet loss percent")
+			assertStatsEqual(t, test.ExpectedGraphStats, *pingData.Header.Stats, 3, "global graph header")
+			assertTimeSpanEqual(t, test.ExpectedGraphSpan, *pingData.Header.TimeSpan, "global graph header")
+			th.AssertFloatEqual(t, test.ExpectedPacketLoss, pingData.Header.Stats.PacketLoss(), 5, "global packet loss percent")
 			if test.BlockTest != nil {
-				blockVerify(t, graphData, test)
+				blockVerify(t, pingData, test)
 			}
-			assertRunsEqual(t, test.ExpectedRuns, *graphData.Runs)
+			assertRunsEqual(t, test.ExpectedRuns, *pingData.Runs)
+			assert.DeepEqual(t, test.ExpectedSummary, pingData.Summary())
 		})
 	}
 }

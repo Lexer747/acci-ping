@@ -57,8 +57,8 @@ is over half compared to CSV) as well as storing some extra meta data.
 * `acci-ping drawframe [file|folder]` will draw a single frame of the graph for a given `.pings` file, e.g you
   can use the test data in this repo to give it a try:
  ![drawframe demo](images/drawframe.png)
-* `acci-ping rawdata [file] [file...]` will print the statistics and all raw packets found in a `.pings` file
-  to stdout.
+* `acci-ping rawdata -all [file] [file...]` will print the statistics and all raw packets found in a `.pings`
+  file to stdout. Can also print a CSV format with `-csv` instead of `-all`. Provides a summary with no flags.
   ```sh
   $ acci-ping rawdata ./graph/data/testdata/input/medium-minute-gaps.pings
   BEGIN www.google.com: 03 Aug 2024 00:41:06.65 -> 01:02:28.1 (21m21.449886808s) | Average μ 8.167942ms | SD σ 80.4µs | Packet Count 67

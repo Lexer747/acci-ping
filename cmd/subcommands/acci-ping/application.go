@@ -76,10 +76,9 @@ func (app *Application) Run(
 	guiSpeedChange := make(chan ping.Speed)
 	app.addFallbackListener(helpAction(helpCh))
 
-	// TODO make it a command line setting to populate at start
 	control := graph.Presentation{
-		Following:  false,
-		YAxisScale: graph.Linear,
+		Following:  *app.config.followingOnStart,
+		YAxisScale: app.config.YScale(),
 	}
 
 	// The graph will take ownership of the data channel and data pointer.
@@ -93,7 +92,7 @@ func (app *Application) Run(
 			DrawingBuffer:  app.drawBuffer,
 			Presentation:   control,
 			ControlPlane:   app.graphControlPlane,
-			DebugStrict:    *app.config.debugStrict,
+			DebugStrict:    app.config.DebugStrict(),
 			Data:           existingData,
 		},
 	)
@@ -109,8 +108,7 @@ func (app *Application) Run(
 	defer close(guiControlChannel)
 	defer close(guiSpeedChange)
 	// Very high FPS is good for responsiveness in the UI (since it's locked) and re-drawing on a re-size.
-	// TODO configure FPS via command line or other options
-	graph, cleanup, terminalSizeUpdates, err := app.g.Run(ctx, cancelFunc, 240, app.listeners(), app.fallbacks)
+	graph, cleanup, terminalSizeUpdates, err := app.g.Run(ctx, cancelFunc, *app.config.debugFps, app.listeners(), app.fallbacks)
 	termRecover := func() {
 		_ = app.term.ClearScreen(terminal.UpdateSize)
 		cleanup()

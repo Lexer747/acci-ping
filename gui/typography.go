@@ -7,10 +7,10 @@
 package gui
 
 import (
-	"bytes"
 	"strings"
 
 	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 )
 
 // Typography implements the [Draw] interface and knows how to draw text to the screen. Note that it only
@@ -47,7 +47,7 @@ type initialisedTypography struct {
 	maxTextLength int
 }
 
-func (t initialisedTypography) Draw(size terminal.Size, b *bytes.Buffer) {
+func (t initialisedTypography) Draw(size terminal.Size, b *bytes.SafeBuffer) {
 	if t.Len() > t.maxTextLength {
 		b.WriteString(t.ToPrint)
 		return

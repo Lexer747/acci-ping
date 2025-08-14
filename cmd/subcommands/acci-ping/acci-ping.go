@@ -11,6 +11,7 @@ import (
 	"flag"
 	"strings"
 
+	"github.com/Lexer747/acci-ping/graph"
 	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
@@ -22,18 +23,17 @@ import (
 
 type Config struct {
 	*application.BuildInfo
+	*application.SharedFlags
 	*flag.FlagSet
 
-	cpuprofile         *string
-	debugStrict        *bool
+	debugFps           *int
+	debuggingTermSize  *string
 	filePath           *string
+	followingOnStart   *bool
 	hideHelpOnStart    *bool
-	helpDebug          *bool
-	logFile            *string
-	memprofile         *string
+	logarithmicOnStart *bool
 	pingBufferingLimit *int
 	pingsPerMinute     *float64
-	debuggingTermSize  *string
 	testErrorListener  *bool
 	theme              *string
 	url                *string
@@ -41,14 +41,14 @@ type Config struct {
 
 func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
+	sf := application.NewSharedFlags(f)
 	ret := &Config{
-		BuildInfo:          info,
-		cpuprofile:         f.String("debug-cpuprofile", "", "write cpu profile to `file`"),
-		debugStrict:        f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
+		BuildInfo:   info,
+		SharedFlags: sf,
+		FlagSet:     f,
+
 		filePath:           f.String("file", "", "the file to write the pings into. (default data not saved)"),
 		hideHelpOnStart:    f.Bool("hide-help", false, "if this flag is used the help box will be hidden by default"),
-		logFile:            f.String("debug-log", "", "write logs to `file`. (default no logs written)"),
-		memprofile:         f.String("debug-memprofile", "", "write memory profile to `file`"),
 		pingBufferingLimit: new(int),
 		pingsPerMinute: f.Float64("pings-per-minute", 60.0,
 			"sets the speed at which the program will try to get new ping results, 0 represents no limit.\n"+
@@ -62,9 +62,10 @@ func GetFlags(info *application.BuildInfo) *Config {
 			"There's also the builtin themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
 			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
 			" for how to create custom themes."),
-		debuggingTermSize: f.String("debug-term-size", "", "switches the terminal to fixed mode and no iteractivity"),
-		helpDebug:         f.Bool("help-debug", false, "prints all additional debug arguments"),
-		FlagSet:           f,
+		debuggingTermSize:  f.String("debug-term-size", "", "switches the terminal to fixed mode and no iteractivity"),
+		followingOnStart:   f.Bool("follow", false, "if this flag is used the graph will be shown in following mode immediately"),
+		debugFps:           f.Int("debug-fps", 240, "configures the internal tickrate for the graph re-paint look (in FPS)"),
+		logarithmicOnStart: f.Bool("logarithmic", false, "if this flag is used the graph will be shown in logarithmic mode immediately"),
 	}
 	*ret.pingBufferingLimit = 10
 	return ret
@@ -72,13 +73,13 @@ func GetFlags(info *application.BuildInfo) *Config {
 
 func RunAcciPing(c *Config) {
 	check.Check(c.Parsed(), "flags not parsed")
-	closeLogFile := application.InitLogging(*c.logFile, c.BuildInfo)
+	closeLogFile := c.InitLogging(c.BuildInfo)
 	defer closeLogFile()
-	closeCPUProfile := application.InitCPUProfiling(*c.cpuprofile)
+	closeCPUProfile := c.InitCPUProfiling()
 	defer closeCPUProfile()
 
 	app := Application{}
-	closeMemProfile := application.InitMemProfile(*c.memprofile)
+	closeMemProfile := c.InitMemProfile()
 	defer closeMemProfile()
 	ctx, cancelFunc := context.WithCancelCause(context.Background())
 	defer cancelFunc(nil)
@@ -91,6 +92,9 @@ func RunAcciPing(c *Config) {
 	}
 }
 
-func (c *Config) HelpDebug() bool {
-	return *c.helpDebug
+func (c *Config) YScale() graph.YAxisScale {
+	if c.logarithmicOnStart == nil || !*c.logarithmicOnStart {
+		return graph.Linear
+	}
+	return graph.Logarithmic
 }

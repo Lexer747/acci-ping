@@ -137,7 +137,7 @@ func NewGraph(ctx context.Context, cfg GraphConfiguration) *Graph {
 func (g *Graph) Run(
 	ctx context.Context,
 	stop context.CancelCauseFunc,
-	fps int,
+	fps int, // this isn't really an FPS given how the GUI is setup and paint buffers, more like a max re-paint delay timer thing.
 	listeners []terminal.ConditionalListener,
 	fallbacks []terminal.Listener,
 ) (func() error, func(), <-chan terminal.Size, error) {

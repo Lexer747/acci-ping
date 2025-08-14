@@ -7,7 +7,6 @@
 package graph
 
 import (
-	"bytes"
 	"fmt"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/terminal/typography"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/numeric"
 	"github.com/Lexer747/acci-ping/utils/sliceutils"
 )
@@ -69,7 +69,7 @@ var padding string
 var origin string
 
 func computeXAxis(
-	toWriteTo, toWriteSpanBars *bytes.Buffer,
+	toWriteTo, toWriteSpanBars *bytes.SafeBuffer,
 	s terminal.Size,
 	overall *data.TimeSpan,
 	spans []*graphdata.SpanInfo,
@@ -215,7 +215,7 @@ func combineSpansPixelWise(spans []*graphdata.SpanInfo, startingWidth, total int
 	return retSpans
 }
 
-func xAxisDrawTimes(b *bytes.Buffer, times []string, remaining int, padding string) int {
+func xAxisDrawTimes(b *bytes.SafeBuffer, times []string, remaining int, padding string) int {
 	for _, point := range times {
 		if remaining <= len(point) {
 			break

@@ -7,9 +7,9 @@
 package draw
 
 import (
-	"bytes"
 	"sync/atomic"
 
+	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/sliceutils"
 )
 
@@ -19,7 +19,7 @@ import (
 // allocate for drawing is bounded for the amount of the single largest frame we ever draw. This has huge
 // performance improvements over creating string literals because it's gets the GC out of our way.
 type Buffer struct {
-	storage []*bytes.Buffer
+	storage []*bytes.SafeBuffer
 }
 
 // TODO paint buffer should be application level and agnostic to the draw buffer itself.
@@ -33,7 +33,7 @@ func NewPaintBuffer() *Buffer {
 type Index int
 
 // Get the underlying buffer for this z-index
-func (b *Buffer) Get(z Index) *bytes.Buffer {
+func (b *Buffer) Get(z Index) *bytes.SafeBuffer {
 	return b.storage[z]
 }
 
@@ -97,10 +97,10 @@ var GUIIndexes = sliceutils.Remove(PaintOrder, GraphIndexes...)
 // newBuffer creates a new [Buffer] of [n] z-buffers.
 func newBuffer(zMax int) *Buffer {
 	ret := &Buffer{
-		storage: make([]*bytes.Buffer, zMax),
+		storage: make([]*bytes.SafeBuffer, zMax),
 	}
 	for i := range zMax {
-		ret.storage[i] = &bytes.Buffer{}
+		ret.storage[i] = bytes.NewSafeBuffer()
 	}
 	return ret
 }

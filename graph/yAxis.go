@@ -7,7 +7,6 @@
 package graph
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/terminal/typography"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/numeric"
 	"github.com/Lexer747/acci-ping/utils/timeutils"
 )
@@ -52,7 +52,7 @@ func yAxisStartup() {
 
 var spanBar string
 
-func addYAxisVerticalSpanIndicator(bars *bytes.Buffer, s terminal.Size, spans []*XAxisSpanInfo) {
+func addYAxisVerticalSpanIndicator(bars *bytes.SafeBuffer, s terminal.Size, spans []*XAxisSpanInfo) {
 	spanSeparator := makeBar(spanBar, s, true)
 	// Don't draw the last span since this is implied by the end of the terminal
 	for _, span := range spans[:len(spans)-1] {
@@ -67,7 +67,7 @@ func addYAxisVerticalSpanIndicator(bars *bytes.Buffer, s terminal.Size, spans []
 }
 
 func computeYAxis(
-	toWriteTo *bytes.Buffer,
+	toWriteTo *bytes.SafeBuffer,
 	size terminal.Size,
 	stats *data.Stats,
 	url string,

@@ -7,7 +7,6 @@
 package graph
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/terminal/typography"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 
@@ -94,7 +94,7 @@ func drawWindowStartUp() {
 var drop string
 var dropFiller string
 
-func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.Buffer) {
+func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.SafeBuffer) {
 	// These can be indeterministically (map order) drawn since we guarantee uniqueness of the coords,
 	// therefore meaning no map [drawnData] will ever contain the same coords which have different ping counts
 	for c, point := range dw.cache {
@@ -306,7 +306,7 @@ func (dw *drawWindow) getOverlap(x, y int) string {
 
 // getKey will write to the draw buffer the key needed for this draw window, where is minimizes the amount of
 // text needed to show the key for all the points drawn.
-func (dw *drawWindow) getKey(toWriteTo *bytes.Buffer) {
+func (dw *drawWindow) getKey(toWriteTo *bytes.SafeBuffer) {
 	if dw.max > loadsThreshold {
 		fmt.Fprintf(toWriteTo, themes.Secondary("Key")+themes.Primary(": ")+
 			single+" = %d "+bar+" "+few+" = %d-%d "+bar+" "+many+" = %d-%d "+bar+" "+loads+" = %d+    ",

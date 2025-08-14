@@ -24,20 +24,17 @@ import (
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/check"
+	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/exit"
 	"github.com/Lexer747/acci-ping/utils/flags"
 )
 
 type Config struct {
 	*application.BuildInfo
+	*application.SharedFlags
 	*flag.FlagSet
 
-	cpuprofile  *string
 	debugFollow *bool
-	debugStrict *bool
-	helpDebug   *bool
-	logFile     *string
-	memprofile  *string
 	termSize    *string
 	theme       *string
 	yAxisScale  *bool
@@ -45,13 +42,13 @@ type Config struct {
 
 func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
+	sf := application.NewSharedFlags(f)
 	ret := &Config{
 		BuildInfo:   info,
-		cpuprofile:  f.String("debug-cpuprofile", "", "write cpu profile to `file`"),
-		debugStrict: f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
+		SharedFlags: sf,
+		FlagSet:     f,
+
 		debugFollow: f.Bool("debug-follow", false, "switches drawing to followLastSpan."),
-		logFile:     f.String("l", "", "write logs to `file`. (default no logs written)"),
-		memprofile:  f.String("debug-memprofile", "", "write memory profile to `file`"),
 		termSize: f.String("term-size", "", "controls the terminal size and fixes it to the input,"+
 			" input is in the form \"<H>x<W>\" e.g. 20x80. H and W must be integers - where H == height, and W == width of the terminal."),
 		theme: f.String("theme", "", "the colour theme (either a path or builtin theme name) to use for the program,\n"+
@@ -61,8 +58,6 @@ func GetFlags(info *application.BuildInfo) *Config {
 			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
 			" for how to create custom themes."),
 		yAxisScale: f.Bool("log-scale", false, "switches the y-axis to be in logarithmic scaling instead of linear"),
-		helpDebug:  f.Bool("help-debug", false, "prints all additional debug arguments"),
-		FlagSet:    f,
 	}
 	f.Usage = func() {
 		var programName = "acci-ping " + ansi.Green("drawframe")
@@ -82,13 +77,12 @@ func GetFlags(info *application.BuildInfo) *Config {
 
 func RunDrawFrame(c *Config) {
 	check.Check(c.Parsed(), "flags not parsed")
-	closeLogFile := application.InitLogging(*c.logFile, c.BuildInfo)
+	closeLogFile := c.InitLogging(c.BuildInfo)
 	defer closeLogFile()
-	closeCPUProfile := application.InitCPUProfiling(*c.cpuprofile)
+	closeCPUProfile := c.InitCPUProfiling()
 	defer closeCPUProfile()
-	closeMemProfile := application.InitMemProfile(*c.memprofile)
+	closeMemProfile := c.InitMemProfile()
 	defer closeMemProfile()
-	profiling := *c.cpuprofile != "" || *c.memprofile != ""
 
 	toPrint := c.Args()
 	if len(toPrint) == 0 {
@@ -96,7 +90,7 @@ func RunDrawFrame(c *Config) {
 		exit.Success()
 	}
 
-	term, err := makeTerminal(c.termSize)
+	term, err := makeTerminal(c.termSize, c.DebugStrict())
 	exit.OnErrorMsg(err, "failed to open terminal to draw")
 
 	err = application.LoadTheme(*c.theme, term)
@@ -104,16 +98,11 @@ func RunDrawFrame(c *Config) {
 	graph.StartUp()
 
 	for _, path := range toPrint {
-		run(term, path, profiling, *c.yAxisScale, *c.debugFollow, *c.debugStrict)
+		run(term, path, c.Profiling(), *c.yAxisScale, *c.debugFollow, c.DebugStrict())
 	}
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
-}
-
-// TODO really do make this shared between things that want debug ...
-func (c *Config) HelpDebug() bool {
-	return *c.helpDebug
 }
 
 func run(term *terminal.Terminal, path string, profiling, logScale, debugFollow, debugStrict bool) {
@@ -147,12 +136,12 @@ func do(path string, term *terminal.Terminal, profiling, logScale, debugFollow, 
 	}
 	g := makeGraph(term, debugFollow, scale, debugStrict, d)
 
-	// TODO dont profile like this when iterating over a folder of inputs.
+	// TODO don't profile like this when iterating over a folder of inputs.
 	if profiling {
 		timer := time.NewTimer(time.Second * 30)
 		running := true
 		for running {
-			printGraph(term, g, debugFollow, debugStrict)
+			printGraph(g)
 			g.ClearForPerfTest()
 			select {
 			case <-timer.C:
@@ -161,19 +150,32 @@ func do(path string, term *terminal.Terminal, profiling, logScale, debugFollow, 
 			}
 		}
 	} else {
-		printGraph(term, g, debugFollow, debugStrict)
+		printGraph(g)
 	}
 }
 
-func makeTerminal(termSize *string) (*terminal.Terminal, error) {
+func makeTerminal(termSize *string, debugStrict bool) (*terminal.Terminal, error) {
+	fallback := func(t *terminal.Terminal, err error) (*terminal.Terminal, error) {
+		if err == nil || debugStrict {
+			return t, err
+		}
+
+		// In the case that we're not in strict mode so we should retry with a sane default terminal size.
+		if errors.Is(err, terminal.TermSizeError) {
+			return terminal.NewDebuggingTerminal(terminal.Size{Height: 20, Width: 100})
+		}
+		return t, err
+	}
 	if termSize != nil && *termSize != "" {
-		return terminal.NewParsedFixedSizeTerminal(*termSize)
+		t, err := terminal.NewParsedFixedSizeTerminal(*termSize)
+		return fallback(t, err)
 	} else {
-		return terminal.NewTerminal()
+		t, err := terminal.NewTerminal()
+		return fallback(t, err)
 	}
 }
 
-func printGraph(term *terminal.Terminal, g *graph.Graph, debugFollow, debugStrict bool) {
+func printGraph(g *graph.Graph) {
 	err := g.OneFrame()
 	if err != nil {
 		panic(err.Error())

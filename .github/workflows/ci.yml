@@ -34,6 +34,9 @@ jobs:
     - name: Test
       run: go test -race ./...
 
+    - name: Sub command Test
+      run: $GITHUB_WORKSPACE/tools/sub-command-test.sh
+
   golangci-lint:
     name: lint
     runs-on: ubuntu-latest

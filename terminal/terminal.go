@@ -86,9 +86,8 @@ type Terminal struct {
 func NewTerminal() (*Terminal, error) {
 	stdoutIsTerm := term.IsTerminal(int(os.Stdout.Fd()))
 	stdErrIsTerm := term.IsTerminal(int(os.Stderr.Fd()))
-	sizeErr := errors.Errorf("Not an expected terminal environment cannot get terminal size")
 	if !(stdoutIsTerm || stdErrIsTerm) {
-		return nil, sizeErr
+		return nil, TermSizeError
 	}
 	size, err := getCurrentTerminalSize(os.Stdout)
 	if err != nil {
@@ -109,7 +108,7 @@ func NewTerminal() (*Terminal, error) {
 			} else if stdoutIsTerm {
 				return getCurrentTerminalSize(os.Stdout)
 			} else {
-				return Size{}, sizeErr
+				return Size{}, TermSizeError
 			}
 		},
 		isTestTerminal: false,
@@ -347,6 +346,9 @@ func (t *Terminal) BackgroundColour() (themes.Luminance, bool) {
 	return t.backgroundColour, t.backgroundDiscovered == foundSuccess
 }
 
+var TermSizeError = errors.New("failed to get terminal size")
+var TermRawError = errors.New("failed to set terminal to raw mode")
+
 type backgroundDiscovered int
 
 const (
@@ -450,7 +452,7 @@ func (t *Terminal) listen(
 // attached (e.g. go tests).
 func getCurrentTerminalSize(file *os.File) (Size, error) {
 	w, h, err := term.GetSize(int(file.Fd()))
-	return Size{Height: h, Width: w}, errors.Wrap(err, "failed to get terminal size")
+	return Size{Height: h, Width: w}, errors.WrapErr(err, TermSizeError)
 }
 
 func (t *Terminal) supportsRaw(file *os.File) error {
@@ -460,5 +462,5 @@ func (t *Terminal) supportsRaw(file *os.File) error {
 	if oldState != nil {
 		restoreErr = term.Restore(inFd, oldState)
 	}
-	return errors.Wrap(errors.Join(makeRawErr, restoreErr), "failed to set terminal to raw mode")
+	return errors.WrapErr(errors.Join(makeRawErr, restoreErr), TermRawError)
 }

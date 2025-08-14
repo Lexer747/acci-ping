@@ -7,13 +7,13 @@
 package gui
 
 import (
-	"bytes"
 	"strconv"
 	"strings"
 
 	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 )
 
 type Box struct {
@@ -49,7 +49,7 @@ type BoxCfg struct {
 	DefaultWidth int
 }
 
-func (b Box) Draw(size terminal.Size, buf *bytes.Buffer) {
+func (b Box) Draw(size terminal.Size, buf *bytes.SafeBuffer) {
 	p := b.position(size)
 	bar := strings.Repeat(b.Style.getHorizontal(), b.boxTextWidth(size))
 	corners := b.Style.getCorner()

@@ -7,7 +7,6 @@
 package gui_test
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/Lexer747/acci-ping/gui"
 	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/env"
 	"github.com/Lexer747/acci-ping/utils/sliceutils"
 	"github.com/Lexer747/acci-ping/utils/th"
@@ -174,7 +174,7 @@ func (tc *testCase) Run(t *testing.T) {
 		Position: tc.position,
 		Style:    tc.style,
 	}
-	buffer := &bytes.Buffer{}
+	buffer := bytes.NewSafeBuffer()
 	testBox.Draw(tc.size, buffer)
 	b := th.MakeBuffer(tc.size)
 	result := th.EmulateTerminal(buffer.String(), b, tc.size, th.SilentlyDrop)

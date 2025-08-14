@@ -7,6 +7,7 @@
 package application
 
 import (
+	"flag"
 	"io"
 	"log/slog"
 	"os"
@@ -63,8 +64,33 @@ func MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP, TAG string) *BuildInfo
 	}
 }
 
-func InitLogging(file string, info *BuildInfo) (toDefer func()) {
-	if file != "" {
+// SharedFlags contains duplicated flags that ANY program may want to interact with. Set it up by calling
+// [NewSharedFlags] then doing the normal flag parse. After this you can set up all the profiling by calling
+// the public functions:
+//   - [SharedFlags.InitLogging]
+//   - [SharedFlags.InitCPUProfiling]
+//   - [SharedFlags.InitMemProfile]
+type SharedFlags struct {
+	cpuprofile  *string
+	debugStrict *bool
+	logFile     *string
+	helpDebug   *bool
+	memprofile  *string
+}
+
+func NewSharedFlags(f *flag.FlagSet) *SharedFlags {
+	return &SharedFlags{
+		cpuprofile:  f.String("debug-cpuprofile", "", "write cpu profile to `file`"),
+		debugStrict: f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
+		logFile:     f.String("debug-log", "", "write logs to `file`. (default no logs written)"),
+		memprofile:  f.String("debug-memprofile", "", "write memory profile to `file`"),
+		helpDebug:   f.Bool("help-debug", false, "prints all additional debug arguments"),
+	}
+}
+
+func (sf *SharedFlags) InitLogging(info *BuildInfo) (toDefer func()) {
+	if sf.logFile != nil && *sf.logFile != "" {
+		file := *sf.logFile
 		f, err := os.Create(file)
 		check.NoErr(err, "could not create Log file")
 		h := slog.NewTextHandler(f, &slog.HandlerOptions{
@@ -93,22 +119,23 @@ func InitLogging(file string, info *BuildInfo) (toDefer func()) {
 	return func() {}
 }
 
-func InitCPUProfiling(cpuprofile string) (toDefer func()) {
-	if cpuprofile == "" {
+func (sf *SharedFlags) InitCPUProfiling() (toDefer func()) {
+	if sf.cpuprofile == nil || *sf.cpuprofile == "" {
 		return func() {}
 	}
-	cpuFile, err := os.Create(cpuprofile)
+	file := *sf.cpuprofile
+	cpuFile, err := os.Create(file)
 	check.NoErr(err, "could not create CPU profile")
 	err = pprof.StartCPUProfile(cpuFile)
 	check.NoErr(err, "could not start CPU profile")
-	traceFile, err := os.Create("trace-" + cpuprofile)
+	traceFile, err := os.Create("trace-" + file)
 	check.NoErr(err, "could not create Trace CPU profile")
 	err = trace.Start(traceFile)
 	check.NoErr(err, "could not start Trace CPU profile")
 
-	slog.Debug("Started CPU & Trace profile", "path", cpuprofile)
+	slog.Debug("Started CPU & Trace profile", "path", file)
 	return func() {
-		slog.Debug("Writing CPU profile", "path", cpuprofile)
+		slog.Debug("Writing CPU profile", "path", file)
 		trace.Stop()
 		pprof.StopCPUProfile()
 		check.NoErr(cpuFile.Sync(), "failed to Sync profile")
@@ -118,11 +145,12 @@ func InitCPUProfiling(cpuprofile string) (toDefer func()) {
 	}
 }
 
-func InitMemProfile(memprofile string) (toDefer func()) {
-	if memprofile == "" {
+func (sf *SharedFlags) InitMemProfile() (toDefer func()) {
+	if sf.memprofile == nil || *sf.memprofile == "" {
 		return func() {}
 	}
-	f, err := os.Create(memprofile)
+	file := *sf.memprofile
+	f, err := os.Create(file)
 	check.NoErr(err, "could not create memory profile")
 
 	doMemProfile := func() {
@@ -142,6 +170,27 @@ func InitMemProfile(memprofile string) (toDefer func()) {
 		doMemProfile()
 		f.Close()
 	}
+}
+
+func (sf *SharedFlags) Profiling() bool {
+	if sf.cpuprofile == nil || sf.memprofile == nil {
+		return false
+	}
+	return *sf.cpuprofile != "" || *sf.memprofile != ""
+}
+
+func (sf *SharedFlags) DebugStrict() bool {
+	if sf.debugStrict == nil {
+		return false
+	}
+	return *sf.debugStrict
+}
+
+func (sf *SharedFlags) HelpDebug() bool {
+	if sf.helpDebug == nil {
+		return false
+	}
+	return *sf.helpDebug
 }
 
 func LoadTheme(themeStr string, term *terminal.Terminal) error {

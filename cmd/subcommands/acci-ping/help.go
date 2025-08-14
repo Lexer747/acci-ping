@@ -7,13 +7,13 @@
 package acciping
 
 import (
-	"bytes"
 	"context"
 
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/gui"
 	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 )
 
 // help which should only be called once the paint buffer is initialised.
@@ -47,7 +47,7 @@ type help struct {
 	showHelp bool
 }
 
-func (h help) render(size terminal.Size, buf *bytes.Buffer) gui.PaintUpdate {
+func (h help) render(size terminal.Size, buf *bytes.SafeBuffer) gui.PaintUpdate {
 	ret := gui.None
 	shouldInvalidate := buf.Len() != 0
 	if shouldInvalidate {
@@ -103,7 +103,8 @@ func helpStartup() {
 			TextLen: 6 + 1 + 30, Alignment: gui.Left},
 		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindNegative + themes.Primary(" to slow down the data capture."),
 			TextLen: 6 + 1 + 31, Alignment: gui.Left},
-		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindH + themes.Primary(" to open/close this window."),
+		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindH + themes.Primary(" to ") +
+			themes.Positive("open") + themes.Primary("/") + themes.Negative("close") + themes.Primary(" this window."),
 			TextLen: 6 + 1 + 27, Alignment: gui.Left},
 	)
 }

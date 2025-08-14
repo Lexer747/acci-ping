@@ -10,6 +10,8 @@ go mod tidy
 goimports -w .
 golangci-lint run
 
+ROOT=$(git rev-parse --show-toplevel)
+
 export SHOULD_TEST_NETWORK=1
 export LOCAL_FRAME_DIFFS=1
 
@@ -29,3 +31,5 @@ if [ $testsExitCode -eq 0 ] || [[ "$1" == "update" ]]; then
 	find . -name '*.no-commit-actual' -delete
 	find . -type d -empty -delete
 fi
+
+"$ROOT"/tools/sub-command-test.sh

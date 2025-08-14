@@ -7,11 +7,11 @@
 package gui
 
 import (
-	"bytes"
 	"strconv"
 	"sync"
 
 	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 
@@ -121,7 +121,7 @@ type Token interface {
 // Draw is the high level interface that any GUI component should implement which will draw itself to the byte
 // buffer.
 type Draw interface {
-	Draw(size terminal.Size, b *bytes.Buffer)
+	Draw(size terminal.Size, b *bytes.SafeBuffer)
 }
 
 var _ Draw = (&Box{})

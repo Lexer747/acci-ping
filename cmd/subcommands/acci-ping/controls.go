@@ -7,13 +7,13 @@
 package acciping
 
 import (
-	"bytes"
 	"context"
 
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/graph"
 	"github.com/Lexer747/acci-ping/gui"
 	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 )
 
 // showControls which should only be called once the paint buffer is initialised.
@@ -48,7 +48,7 @@ type controlState struct {
 	graph.Presentation
 }
 
-func (c controlState) render(size terminal.Size, buf *bytes.Buffer) gui.PaintUpdate {
+func (c controlState) render(size terminal.Size, buf *bytes.SafeBuffer) gui.PaintUpdate {
 	ret := gui.None
 	buf.Reset()
 	if !c.Following || c.YAxisScale != graph.Logarithmic {

@@ -7,7 +7,6 @@
 package graph
 
 import (
-	"bytes"
 	"io"
 	"math"
 	"strings"
@@ -23,6 +22,7 @@ import (
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/terminal/typography"
 	"github.com/Lexer747/acci-ping/utils"
+	"github.com/Lexer747/acci-ping/utils/bytes"
 	"github.com/Lexer747/acci-ping/utils/errors"
 	"github.com/Lexer747/acci-ping/utils/numeric"
 )
@@ -187,7 +187,7 @@ func (g gradientState) draw() bool {
 
 func computeFrame(
 	g *Graph,
-	toWriteGradientTo, toWriteTo, toWriteDroppedTo, toWriteKeyTo *bytes.Buffer,
+	toWriteGradientTo, toWriteTo, toWriteDroppedTo, toWriteKeyTo *bytes.SafeBuffer,
 	iter *graphdata.Iter,
 	runs *data.Runs,
 	xAxis drawingXAxis,
@@ -329,7 +329,7 @@ func shouldGradient(runs *data.Runs) bool {
 	return runs.GoodPackets.Longest > 2
 }
 
-func makeTitle(toWriteTo *bytes.Buffer, size terminal.Size, stats *data.Stats, url string) {
+func makeTitle(toWriteTo *bytes.SafeBuffer, size terminal.Size, stats *data.Stats, url string) {
 	const yAxisTitle = "Ping "
 	sizeStr := size.String()
 	titleBegin := themes.Emphasis(url)

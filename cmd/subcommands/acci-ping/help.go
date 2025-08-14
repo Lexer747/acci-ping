@@ -103,7 +103,8 @@ func helpStartup() {
 			TextLen: 6 + 1 + 30, Alignment: gui.Left},
 		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindNegative + themes.Primary(" to slow down the data capture."),
 			TextLen: 6 + 1 + 31, Alignment: gui.Left},
-		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindH + themes.Primary(" to open/close this window."),
+		gui.Typography{ToPrint: themes.Primary("Press ") + keyBindH + themes.Primary(" to ") +
+			themes.Positive("open") + themes.Primary("/") + themes.Negative("close") + themes.Primary(" this window."),
 			TextLen: 6 + 1 + 27, Alignment: gui.Left},
 	)
 }

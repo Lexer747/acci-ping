@@ -11,13 +11,14 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/Lexer747/acci-ping/cmd/tab_completion/tabflags"
 	"github.com/Lexer747/acci-ping/ping"
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/exit"
 )
 
 type Config struct {
-	*flag.FlagSet
+	*tabflags.FlagSet
 
 	url   *string
 	count *int
@@ -25,10 +26,11 @@ type Config struct {
 
 func GetFlags() *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
+	tf := tabflags.NewAutoCompleteFlagSet(f, false, "")
 	ret := &Config{
-		url:     f.String("url", "www.google.com", "the url to target for ping testing"),
-		count:   f.Int("n", 4, "the number of packets to send. 0 or smaller means continuous running."),
-		FlagSet: f,
+		url:     tf.String("url", "www.google.com", "the url to target for ping testing", tabflags.AutoComplete{}),
+		count:   tf.Int("n", 4, "the number of packets to send. 0 or smaller means continuous running."),
+		FlagSet: tf,
 	}
 	return ret
 }

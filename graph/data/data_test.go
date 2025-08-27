@@ -11,7 +11,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"slices"
-	"strings"
+	"strconv"
 	"testing"
 	"time"
 
@@ -223,8 +223,29 @@ var origin = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func TestData(t *testing.T) {
 	t.Parallel()
-
 	testCases := []DataTestCase{
+		{
+			Values: sameIP([]ping.PingDataPoint{
+				{Duration: 5 * time.Millisecond, Timestamp: origin},
+			}),
+			ExpectedGraphSpan: data.TimeSpan{
+				Begin: origin,
+				End:   origin,
+			},
+			ExpectedGraphStats: data.Stats{
+				GoodCount: 1,
+				Mean:      5e6,
+			},
+			ExpectedRuns: data.Runs{
+				GoodPackets: &data.Run{
+					Longest: 1,
+					Current: 1,
+				},
+			},
+			ExpectedTotalCount: 1,
+			//nolint:lll
+			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2] | 01 Jan 2000 00:00:00 -> 00:00:00 (0s) | Average μ 5ms | SD σ 0s | Dropped 0 | Good Packets 1 | Packet Count 1 | Longest Streak 1",
+		},
 		{
 			Values: sameIP([]ping.PingDataPoint{
 				{Duration: 5 * time.Millisecond, Timestamp: origin},
@@ -251,7 +272,7 @@ func TestData(t *testing.T) {
 			}},
 			ExpectedTotalCount: 5,
 			//nolint:lll
-			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2] | 01 Jan 2000 00:00:00 -> 00:04:00 (4m0s) | Average μ 5.2ms | SD σ 1.483239ms | Dropped 0 | Good Packets 5 | Packet Count 5 | Longest Streak 5 01 Jan 2000 00:00:00 -> 00:04:00 (0s)",
+			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2] | 01 Jan 2000 00:00:00 -> 00:04:00 (4m0s) | Average μ 5.2ms | SD σ 1.483239ms | Dropped 0 | Good Packets 5 | Packet Count 5 | Longest Streak 5 01 Jan 2000 00:00:00 -> 00:04:00 (4m0s)",
 		},
 		{
 			Values: slices.Concat(
@@ -319,7 +340,7 @@ func TestData(t *testing.T) {
 			}},
 			ExpectedTotalCount: 10,
 			//nolint:lll
-			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2,255.255.255.255] | 01 Jan 2000 00:00:00 -> 00:00:00 (9ns) | Average μ 5ns | SD σ 1ns | Dropped 0 | Good Packets 10 | Packet Count 10 | Longest Streak 10 01 Jan 2000 00:00:00 -> 00:00:00 (0s)",
+			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2,255.255.255.255] | 01 Jan 2000 00:00:00 -> 00:00:00 (9ns) | Average μ 5ns | SD σ 1ns | Dropped 0 | Good Packets 10 | Packet Count 10 | Longest Streak 10 01 Jan 2000 00:00:00 -> 00:00:00 (9ns)",
 		},
 		{
 			Values: sameIP([]ping.PingDataPoint{
@@ -363,15 +384,12 @@ func TestData(t *testing.T) {
 				Current:         0,
 			}},
 			//nolint:lll
-			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2] | 01 Jan 2000 00:00:00 -> 00:40:00 (40m0s) | Average μ 15.25ms | SD σ 1.707825ms | PacketLoss 20.0% | Dropped 1 | Good Packets 4 | Packet Count 5 | Longest Streak 2 01 Jan 2000 00:00:00 -> 00:10:00 (0s) | Longest Drop Streak 1 01 Jan 2000 00:20:00 -> 00:20:00 (0s)",
+			ExpectedSummary: "www.google.com: PingsMeta#3 [224.0.0.2] | 01 Jan 2000 00:00:00 -> 00:40:00 (40m0s) | Average μ 15.25ms | SD σ 1.707825ms | PacketLoss 20.0% | Dropped 1 | Good Packets 4 | Packet Count 5 | Longest Streak 2 01 Jan 2000 00:00:00 -> 00:10:00 (10m0s) | Longest Drop Streak 1",
 		},
 	}
 
 	for i, test := range testCases {
-		sliceAsStr := strings.Join(sliceutils.Map(test.Values, func(p ping.PingResults) string {
-			return p.String()
-		}), ",")
-		t.Run(fmt.Sprintf("%d:[%s]", i, sliceAsStr), func(t *testing.T) {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			pingData := data.NewData("www.google.com")
 			for _, v := range test.Values {
@@ -384,7 +402,7 @@ func TestData(t *testing.T) {
 				blockVerify(t, pingData, test)
 			}
 			assertRunsEqual(t, test.ExpectedRuns, *pingData.Runs)
-			assert.DeepEqual(t, test.ExpectedSummary, pingData.Summary())
+			assert.Equal(t, test.ExpectedSummary, pingData.Summary())
 		})
 	}
 }

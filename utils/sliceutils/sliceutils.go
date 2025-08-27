@@ -107,3 +107,29 @@ func SplitN[S ~[]T, T any](slice S, splitAfterN int) []S {
 	}
 	return ret
 }
+
+// Filter returns a shallow clone of [slice] where only the values which return true from the predicate are
+// included.
+func Filter[S ~[]T, T any](slice S, useInOutput func(T) bool) S {
+	ret := make(S, 0)
+	for _, item := range slice {
+		if useInOutput(item) {
+			ret = append(ret, item)
+		}
+	}
+	return ret
+}
+
+// TakeRandom returns a random element from the slice, or the zero value if the slice is empty.
+//
+// This is not a cryptographically secure random, do not use this for security.
+func TakeRandom[S ~[]T, T any](slice S) T {
+	if len(slice) <= 0 {
+		return *new(T)
+	}
+	// G404 warned about in the doc comment
+
+	//nolint:gosec
+	dealersChoice := rand.IntN(len(slice) - 1)
+	return slice[dealersChoice]
+}

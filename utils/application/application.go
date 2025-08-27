@@ -7,7 +7,6 @@
 package application
 
 import (
-	"flag"
 	"io"
 	"log/slog"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"runtime/trace"
 	"strings"
 
+	"github.com/Lexer747/acci-ping/cmd/tab_completion/tabflags"
 	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/utils/check"
@@ -78,13 +78,13 @@ type SharedFlags struct {
 	memprofile  *string
 }
 
-func NewSharedFlags(f *flag.FlagSet) *SharedFlags {
+func NewSharedFlags(tf *tabflags.FlagSet) *SharedFlags {
 	return &SharedFlags{
-		cpuprofile:  f.String("debug-cpuprofile", "", "write cpu profile to `file`"),
-		debugStrict: f.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
-		logFile:     f.String("debug-log", "", "write logs to `file`. (default no logs written)"),
-		memprofile:  f.String("debug-memprofile", "", "write memory profile to `file`"),
-		helpDebug:   f.Bool("help-debug", false, "prints all additional debug arguments"),
+		cpuprofile:  tf.String("debug-cpuprofile", "", "write cpu profile to `file`", tabflags.AutoComplete{WantsFile: true}),
+		debugStrict: tf.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
+		logFile:     tf.String("debug-log", "", "write logs to `file`. (default no logs written)", tabflags.AutoComplete{WantsFile: true}),
+		memprofile:  tf.String("debug-memprofile", "", "write memory profile to `file`", tabflags.AutoComplete{WantsFile: true}),
+		helpDebug:   tf.Bool("help-debug", false, "prints all additional debug arguments"),
 	}
 }
 

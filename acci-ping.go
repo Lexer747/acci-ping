@@ -17,6 +17,7 @@ import (
 	"github.com/Lexer747/acci-ping/cmd/subcommands/ping"
 	"github.com/Lexer747/acci-ping/cmd/subcommands/rawdata"
 	"github.com/Lexer747/acci-ping/cmd/subcommands/version"
+	tabcompletion "github.com/Lexer747/acci-ping/cmd/tab_completion"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/utils/application"
 	"github.com/Lexer747/acci-ping/utils/errors"
@@ -76,34 +77,46 @@ var mainDescription = programName + " can run be with no arguments to start the 
 
 func main() {
 	info := application.MakeBuildInfo(COMMIT, GO_VERSION, BRANCH, TIMESTAMP, TAG)
+	a := acciping.GetFlags(info)
+	df := drawframe.GetFlags(info)
+	rd := rawdata.GetFlags()
+	p := ping.GetFlags()
+	v := version.GetFlags(info)
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case drawframeString:
-			df := drawframe.GetFlags(info)
-			FlagParseError(df.Parse(os.Args[2:]))
-			PrintHelpDebugIfNeeded(df.HelpDebug(), df.FlagSet)
+			flagParseError(df.Parse(os.Args[2:]))
+			PrintHelpDebugIfNeeded(df.HelpDebug(), df.FlagSet.FlagSet)
 			drawframe.RunDrawFrame(df)
 			exit.Success()
 		case rawdataString:
-			rd := rawdata.GetFlags()
-			FlagParseError(rd.Parse(os.Args[2:]))
+			flagParseError(rd.Parse(os.Args[2:]))
 			rawdata.RunPrintData(rd)
 			exit.Success()
 		case pingString:
-			p := ping.GetFlags()
-			FlagParseError(p.Parse(os.Args[2:]))
+			flagParseError(p.Parse(os.Args[2:]))
 			ping.RunPing(p)
 			exit.Success()
 		case versionString:
-			p := version.GetFlags(info)
-			FlagParseError(p.Parse(os.Args[2:]))
-			version.RunVersion(p)
+			flagParseError(v.Parse(os.Args[2:]))
+			version.RunVersion(v)
+			exit.Success()
+		case tabcompletion.AutoCompleteString:
+			tabcompletion.Run(
+				os.Args,
+				tabcompletion.Command{Cmd: os.Args[0], Fs: a.FlagSet},
+				[]tabcompletion.Command{
+					{Cmd: drawframeString, Fs: df.FlagSet},
+					{Cmd: rawdataString, Fs: rd.FlagSet},
+					{Cmd: pingString, Fs: p.FlagSet},
+					{Cmd: versionString, Fs: v.FlagSet},
+				},
+			)
 			exit.Success()
 		default:
 			// fallthrough
 		}
 	}
-	a := acciping.GetFlags(info)
 	a.Usage = func() {
 		subCommandUsage(a.Output())
 		if a.HelpDebug() {
@@ -112,8 +125,8 @@ func main() {
 			flags.PrintFlagsFilter(a.FlagSet, flags.ExcludePrefix("debug"))
 		}
 	}
-	FlagParseError(a.Parse(os.Args[1:]))
-	PrintHelpDebugIfNeeded(a.HelpDebug(), a.FlagSet)
+	flagParseError(a.Parse(os.Args[1:]))
+	PrintHelpDebugIfNeeded(a.HelpDebug(), a.FlagSet.FlagSet)
 	acciping.RunAcciPing(a)
 	exit.Success()
 }
@@ -135,7 +148,7 @@ func subCommandUsage(w io.Writer) {
 	fmt.Fprint(w, "\n"+programName+" arguments:\n")
 }
 
-func FlagParseError(err error) {
+func flagParseError(err error) {
 	if errors.Is(err, flag.ErrHelp) {
 		exit.Silent()
 	} else {

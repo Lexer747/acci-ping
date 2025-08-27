@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/terminal/typography"
@@ -34,7 +35,7 @@ func ParseThemeFromJSON(data []byte) (Theme, error) {
 // DescribeBuiltins gives a detailed slice of strings, where each string represents a builtin theme and it's
 // colour palate.
 func DescribeBuiltins() []string {
-	slices.SortFunc(builtIns, func(a, b themeJSON) int { return cmp.Compare(a.Name, b.Name) })
+	sortBuiltins()
 	return sliceutils.Map(builtIns, func(t themeJSON) string {
 		theme := check.Must(t.Theme())
 		const demo = typography.Block + typography.Block
@@ -48,8 +49,20 @@ func DescribeBuiltins() []string {
 	})
 }
 
+var sortBuiltIns = sync.Once{}
 var builtIns = []themeJSON{}
 var builtInsLookup = map[string]Theme{}
+
+func GetBuiltInNames() []string {
+	sortBuiltins()
+	return sliceutils.Map(builtIns, func(t themeJSON) string { return t.Name })
+}
+
+func sortBuiltins() {
+	sortBuiltIns.Do(func() {
+		slices.SortFunc(builtIns, func(a, b themeJSON) int { return cmp.Compare(a.Name, b.Name) })
+	})
+}
 
 func normalizeName(s string) string {
 	return strings.ToLower(strings.Trim(s, " "))

@@ -11,20 +11,22 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Lexer747/acci-ping/cmd/tab_completion/tabflags"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
 	"github.com/Lexer747/acci-ping/utils/application"
 )
 
 type Config struct {
 	*application.BuildInfo
-	*flag.FlagSet
+	*tabflags.FlagSet
 }
 
 func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
+	tf := tabflags.NewAutoCompleteFlagSet(f, false, "")
 	ret := &Config{
 		BuildInfo: info,
-		FlagSet:   f,
+		FlagSet:   tf,
 	}
 	return ret
 }

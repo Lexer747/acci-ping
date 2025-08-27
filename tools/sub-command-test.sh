@@ -29,9 +29,9 @@ function test-cli {
 	fi
 	exitCode=$?
 	if [[ $exitCode == 0 ]]; then
-		echo -e "${Green}Success${ColorOff} for $*"
+		echo -e "${Green}Success${ColorOff} for 'acci-ping $*'"
 	else
-		echo -e "${Red}Failed${ColorOff} $exitCode for ./out/linux/amd64/acci-ping-linux-amd64 $*"
+		echo -e "${Red}Failed${ColorOff} $exitCode for './out/linux/amd64/acci-ping-linux-amd64 $*'"
 	fi
 	return $exitCode
 }

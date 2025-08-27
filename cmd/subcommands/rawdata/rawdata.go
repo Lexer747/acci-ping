@@ -12,13 +12,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/Lexer747/acci-ping/cmd/tab_completion/tabflags"
 	"github.com/Lexer747/acci-ping/graph/data"
 	"github.com/Lexer747/acci-ping/utils/check"
 	"github.com/Lexer747/acci-ping/utils/exit"
 )
 
 type Config struct {
-	*flag.FlagSet
+	*tabflags.FlagSet
 
 	printAll *bool
 	toCSV    *bool
@@ -26,10 +27,11 @@ type Config struct {
 
 func GetFlags() *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
+	tf := tabflags.NewAutoCompleteFlagSet(f, true, ".pings")
 	ret := &Config{
-		FlagSet:  f,
-		printAll: f.Bool("all", false, "prints all raw values otherwise only summarises '.pings' files"),
-		toCSV:    f.Bool("csv", false, "writes '.pings' files as '.csv'"),
+		FlagSet:  tf,
+		printAll: tf.Bool("all", false, "prints all raw values otherwise only summarises '.pings' files"),
+		toCSV:    tf.Bool("csv", false, "writes '.pings' files as '.csv'"),
 	}
 
 	f.Usage = func() {

@@ -349,11 +349,15 @@ func (r *Runs) Summary(getTimestamp func(int64) time.Time) string {
 func (r *Run) withTimestamp(str string, getTimestamp func(int64) time.Time) string {
 	end := getTimestamp(r.LongestIndexEnd)
 	// G115 the input for longest comes from int64 indexes anyway
-	begin := getTimestamp(r.LongestIndexEnd - int64(r.Longest-1)) //nolint:gosec
+	beginIndex := r.LongestIndexEnd - (int64(r.Longest) - 1) //nolint:gosec
+	if r.LongestIndexEnd == beginIndex || r.Longest == 0 {
+		return fmt.Sprintf("%s %d", str, r.Longest)
+	}
+	begin := getTimestamp(beginIndex)
 	span := TimeSpan{
 		Begin:    begin,
 		End:      end,
-		Duration: 0,
+		Duration: end.Sub(begin),
 	}
 	return fmt.Sprintf("%s %d %s", str, r.Longest, span.String())
 }

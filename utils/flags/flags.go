@@ -9,6 +9,7 @@ package flags
 import (
 	"flag"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 )
@@ -28,7 +29,12 @@ func NoFilter() FilterFunc {
 	return func(*flag.Flag) bool { return false }
 }
 
-func PrintFlagsFilter(fs *flag.FlagSet, filterFunction FilterFunc) {
+type VisitLike interface {
+	VisitAll(fn func(*flag.Flag))
+	Output() io.Writer
+}
+
+func PrintFlagsFilter(fs VisitLike, filterFunction FilterFunc) {
 	var isZeroValueErrs []error
 	fs.VisitAll(func(f *flag.Flag) {
 		if filterFunction(f) {
@@ -46,7 +52,7 @@ func PrintFlagsFilter(fs *flag.FlagSet, filterFunction FilterFunc) {
 
 // forked from go version v1.24.3
 // nolint
-func forkedInLoopImpl(f *flag.Flag, isZeroValueErrs []error, fs *flag.FlagSet) []error {
+func forkedInLoopImpl(f *flag.Flag, isZeroValueErrs []error, fs VisitLike) []error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "  -%s", f.Name) // Two spaces before -; see next two comments.
 	name, usage := flag.UnquoteUsage(f)
@@ -83,7 +89,7 @@ func forkedInLoopImpl(f *flag.Flag, isZeroValueErrs []error, fs *flag.FlagSet) [
 }
 
 // nolint
-func forkedReturnImpl(isZeroValueErrs []error, fs *flag.FlagSet) {
+func forkedReturnImpl(isZeroValueErrs []error, fs VisitLike) {
 	// If calling String on any zero flag.Values triggered a panic, print
 	// the messages after the full set of defaults so that the programmer
 	// knows to fix the panic.

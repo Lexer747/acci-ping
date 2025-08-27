@@ -19,6 +19,10 @@ fi
 # Keep these names in sync, manually updating them if required with the go variables. Also Keep alphabetically sorted.
 BRANCH=$(git branch --show-current)
 COMMIT=$(git rev-parse HEAD)
+git diff-files --quiet &> /dev/null
+if [[ $? != 0 ]]; then
+	COMMIT="$COMMIT~dirty"
+fi
 GO_VERSION=$(go version)
 TAG=$(git describe --tags "$(git rev-list --tags --max-count=1)")
 TIMESTAMP=$(date --rfc-3339=ns)

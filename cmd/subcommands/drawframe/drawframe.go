@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Lexer747/acci-ping/cmd/tab_completion/tabflags"
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/files"
 	"github.com/Lexer747/acci-ping/graph"
@@ -32,7 +33,7 @@ import (
 type Config struct {
 	*application.BuildInfo
 	*application.SharedFlags
-	*flag.FlagSet
+	*tabflags.FlagSet
 
 	debugFollow *bool
 	termSize    *string
@@ -42,22 +43,25 @@ type Config struct {
 
 func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
-	sf := application.NewSharedFlags(f)
+	tf := tabflags.NewAutoCompleteFlagSet(f, true, ".pings")
+	sf := application.NewSharedFlags(tf)
 	ret := &Config{
 		BuildInfo:   info,
 		SharedFlags: sf,
-		FlagSet:     f,
+		FlagSet:     tf,
 
-		debugFollow: f.Bool("debug-follow", false, "switches drawing to followLastSpan."),
-		termSize: f.String("term-size", "", "controls the terminal size and fixes it to the input,"+
-			" input is in the form \"<H>x<W>\" e.g. 20x80. H and W must be integers - where H == height, and W == width of the terminal."),
-		theme: f.String("theme", "", "the colour theme (either a path or builtin theme name) to use for the program,\n"+
+		debugFollow: tf.Bool("debug-follow", false, "switches drawing to followLastSpan."),
+		termSize: tf.String("term-size", "", "controls the terminal size and fixes it to the input,"+
+			" input is in the form \"<H>x<W>\" e.g. 20x80. H and W must be integers - where H == height, and W == width of the terminal.",
+			tabflags.AutoComplete{Choices: []string{"15x80", "20x85", "HxW"}}),
+		theme: tf.String("theme", "", "the colour theme (either a path or builtin theme name) to use for the program,\n"+
 			"if empty this will try to get the background colour of the terminal and pick the\n"+
 			"built in dark or light theme based on the colour found.\n"+
 			"There's also the builtin themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
 			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
-			" for how to create custom themes."),
-		yAxisScale: f.Bool("log-scale", false, "switches the y-axis to be in logarithmic scaling instead of linear"),
+			" for how to create custom themes.",
+			tabflags.AutoComplete{Choices: themes.GetBuiltInNames(), WantsFile: true, FileExt: ".json"}),
+		yAxisScale: tf.Bool("log-scale", false, "switches the y-axis to be in logarithmic scaling instead of linear"),
 	}
 	f.Usage = func() {
 		var programName = "acci-ping " + ansi.Green("drawframe")
@@ -67,9 +71,9 @@ func GetFlags(info *application.BuildInfo) *Config {
 			"\t drawframe [options] FILE\n\n"+
 			"e.g. '%s my_ping_capture.ping'\n", programName, programName)
 		if ret.HelpDebug() {
-			flags.PrintFlagsFilter(ret.FlagSet, flags.NoFilter())
+			flags.PrintFlagsFilter(ret.FlagSet.FlagSet, flags.NoFilter())
 		} else {
-			flags.PrintFlagsFilter(ret.FlagSet, flags.ExcludePrefix("debug"))
+			flags.PrintFlagsFilter(ret.FlagSet.FlagSet, flags.ExcludePrefix("debug"))
 		}
 	}
 	return ret

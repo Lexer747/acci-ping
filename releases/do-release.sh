@@ -6,6 +6,8 @@
 #
 # SPDX-License-Identifier: GPL-2.0-only
 
+set -x
+
 ROOT=$(git rev-parse --show-toplevel)
 SCRIPT_DIR="$ROOT"/releases/
 TOOLS_DIR="$ROOT"/tools/
@@ -13,6 +15,9 @@ TIMESTAMP=$(date --rfc-3339=ns)
 
 MINOR=${1:-"no"}
 PATCH=${2:-"yes"}
+
+VERSION=$(cat "$SCRIPT_DIR"version.txt)
+BEFORE_README="go install github.com/Lexer747/acci-ping@v$VERSION"
 
 if [[ "$MINOR" == "yes" ]]; then
     PATCH="yes"
@@ -22,7 +27,7 @@ function increment {
     MINOR=$1
     PATCH=$2
     SCRIPT_DIR=$3
-    VERSION=$(cat "$SCRIPT_DIR"/version.txt)
+    VERSION=$(cat "$SCRIPT_DIR"version.txt)
     IFS='.' read -ra ADDR <<< "$VERSION"
     if [[ "$PATCH" == "yes" ]]; then
         (( ADDR[2]++ ))
@@ -31,18 +36,23 @@ function increment {
         (( ADDR[1]++ ))
         ADDR[2]="0"
     fi
-    echo "${ADDR[0]}.${ADDR[1]}.${ADDR[2]}" > "$SCRIPT_DIR"/version.txt
+    echo "${ADDR[0]}.${ADDR[1]}.${ADDR[2]}" > "$SCRIPT_DIR"version.txt
 }
 
 increment "$MINOR" "$PATCH" "$SCRIPT_DIR"
 
-VERSION=$(cat "$SCRIPT_DIR"/version.txt)
+VERSION=$(cat "$SCRIPT_DIR"version.txt)
 
-git add "$SCRIPT_DIR"/version.txt
-git commit -m "New release $VERSION"
+AFTER_README="go install github.com/Lexer747/acci-ping@v$VERSION"
 
-git tag -a "$VERSION" -m "Tagged automatically by do-release.sh at $TIMESTAMP"
+git add "$SCRIPT_DIR"version.txt
+git commit -m "New release v$VERSION"
+
+git tag -a "v$VERSION" -m "Tagged automatically by do-release.sh at $TIMESTAMP"
 
 "$TOOLS_DIR"/build.sh sign
 
 cp "$ROOT/out/linux/amd64/acci-ping-linux-amd64" "$HOME/go/bin/acci-ping"
+
+sed "s\\$BEFORE_README\\$AFTER_README\\g" <README.md >README.tmp.md
+mv README.tmp.md README.md

@@ -91,6 +91,12 @@ Download the latest and greatest pre-built binaries from here https://github.com
 and then add them to your `PATH`, probably renaming the binary to just `acci-ping` and then you're ready to
 go!
 
+Or use:
+```sh
+go install github.com/Lexer747/acci-ping@v1.0.3
+```
+To build and install locally via the `go install` toolchain
+
 <details>
 <summary><b>🪟 Windows</b></summary>
 
@@ -126,8 +132,6 @@ Note: you can use this command to undo this behaviour
 sudo sysctl -w net.ipv4.ping_group_range="1 0"
 ```
 </details>
-
-
 
 ## About
 

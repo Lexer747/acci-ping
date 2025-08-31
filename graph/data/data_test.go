@@ -206,16 +206,15 @@ type BlockTest struct {
 }
 
 type DataTestCase struct {
-	Values             []ping.PingResults
-	BlockSize          int
-	ExpectedGraphSpan  data.TimeSpan
-	ExpectedGraphStats data.Stats
-	ExpectedPacketLoss float64
-	ExpectedTotalCount int
 	ExpectedRuns       data.Runs
 	BlockTest          *BlockTest
-
-	ExpectedSummary string
+	ExpectedGraphSpan  data.TimeSpan
+	ExpectedSummary    string
+	Values             []ping.PingResults
+	ExpectedGraphStats data.Stats
+	BlockSize          int
+	ExpectedPacketLoss float64
+	ExpectedTotalCount int
 }
 
 // A fixed time stamp to make all testing relative too

@@ -22,8 +22,8 @@ import (
 )
 
 type drawingYAxis struct {
-	size      int
 	stats     *data.Stats
+	size      int
 	labelSize int
 	scale     YAxisScale
 }

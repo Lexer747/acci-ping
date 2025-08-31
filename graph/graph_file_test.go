@@ -39,11 +39,11 @@ const (
 )
 
 type FileTest struct {
+	TimeZoneOfFile   *time.Location
 	FileName         string
 	Sizes            []terminal.Size
-	OnlyDoLinear     bool
-	TimeZoneOfFile   *time.Location
 	TerminalWrapping th.TerminalWrapping
+	OnlyDoLinear     bool
 }
 
 var StandardTestSizes = []terminal.Size{

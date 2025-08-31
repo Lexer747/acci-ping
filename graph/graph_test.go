@@ -189,9 +189,9 @@ func TestThousandsDrawing(t *testing.T) {
 }
 
 type DrawingTest struct {
-	Size         terminal.Size
-	Values       []ping.PingDataPoint
 	ExpectedFile string
+	Values       []ping.PingDataPoint
+	Size         terminal.Size
 }
 
 //nolint:unused

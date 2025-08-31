@@ -14,7 +14,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/Lexer747/acci-ping/gui/themes"
 	"github.com/Lexer747/acci-ping/terminal/ansi"
@@ -57,27 +56,20 @@ func ParseSize(s string) (Size, bool) {
 //   - [NewParsedFixedSizeTerminal]
 //   - [NewTestTerminal]
 type Terminal struct {
-	size      atomic.Of[Size]
-	listeners []ConditionalListener
-	fallbacks []Listener
-
-	stdin  io.ReadWriter
-	stdout io.ReadWriter
-
-	stdinFd              int
+	stdin                io.ReadWriter
+	stdout               io.ReadWriter
 	terminalSizeCallBack func() (Size, error)
-
-	isTestTerminal bool
-	isDynamicSize  bool
-	neverRaw       bool
-
+	// should be called if a panic occurs otherwise stacktraces are unreadable
+	cleanup              func()
+	fallbacks            []Listener
+	listeners            []ConditionalListener
+	size                 atomic.Of[Size]
+	stdinFd              int
 	backgroundColour     themes.Luminance
 	backgroundDiscovered backgroundDiscovered
-
-	// should be called if a panic occurs otherwise stacktraces are unreadable
-	cleanup func()
-
-	listenMutex *sync.Mutex
+	isTestTerminal       bool
+	isDynamicSize        bool
+	neverRaw             bool
 }
 
 // NewTerminal creates a new terminal which immediately tries to verify that it can operate for
@@ -99,7 +91,6 @@ func NewTerminal() (*Terminal, error) {
 		fallbacks:     []Listener{},
 		stdin:         os.Stdin,
 		stdout:        os.Stdout,
-		listenMutex:   &sync.Mutex{},
 		isDynamicSize: true,
 		stdinFd:       int(os.Stdin.Fd()),
 		terminalSizeCallBack: func() (Size, error) {
@@ -126,7 +117,6 @@ func NewFixedSizeTerminal(s Size) (*Terminal, error) {
 		fallbacks:     []Listener{},
 		stdin:         os.Stdin,
 		stdout:        os.Stdout,
-		listenMutex:   &sync.Mutex{},
 		isDynamicSize: false,
 	}
 	return t, nil
@@ -139,7 +129,6 @@ func NewDebuggingTerminal(s Size) (*Terminal, error) {
 		fallbacks:     []Listener{},
 		stdin:         os.Stdin,
 		stdout:        os.Stdout,
-		listenMutex:   &sync.Mutex{},
 		isDynamicSize: false,
 		neverRaw:      true,
 	}
@@ -183,7 +172,6 @@ func NewTestTerminal(stdinReader, stdoutWriter io.ReadWriter, terminalSizeCallBa
 		terminalSizeCallBack: func() (Size, error) { return terminalSizeCallBack(), nil },
 		isTestTerminal:       true,
 		isDynamicSize:        true,
-		listenMutex:          &sync.Mutex{},
 	}, nil
 }
 
@@ -204,21 +192,20 @@ func (t *Terminal) UpdateSize() error {
 }
 
 type Listener struct {
-	// Name is used for if a listener errors for easier identification, it may be omitted.
-	Name string
 	// Action the callback which will be invoked when a user inputs the applicable rune, the rune passed is
 	// the same rune passed to applicable. Note the terminal size will have been updated before this called,
 	// but this is actually racey if the user is typing while changing size. If an error occurs in this action
 	// the terminal will panic and exit.
 	Action func(rune) error
+	// Name is used for if a listener errors for easier identification, it may be omitted.
+	Name string
 }
 
 type ConditionalListener struct {
-	Listener
-
 	// Applicable is the applicability of this listen, i.e. for which input runes do you want this action to
 	// be fired
 	Applicable func(rune) bool
+	Listener
 }
 
 type userControlCErr struct{}
@@ -358,8 +345,8 @@ const (
 )
 
 type listenResult struct {
-	n   int
 	err error
+	n   int
 }
 
 func (t *Terminal) beingListening(ctx context.Context) {

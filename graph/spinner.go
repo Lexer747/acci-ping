@@ -23,8 +23,8 @@ var spinnerArray = [...]string{
 }
 
 type spinner struct {
-	spinnerIndex       int
 	timestampLastDrawn time.Time
+	spinnerIndex       int
 }
 
 func (s *spinner) spinner(size terminal.Size) string {

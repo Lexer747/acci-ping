@@ -33,3 +33,4 @@ if [ $testsExitCode -eq 0 ] || [[ "$1" == "update" ]]; then
 fi
 
 "$ROOT"/tools/sub-command-test.sh
+"$ROOT"/tools/fieldalignment-lint.sh

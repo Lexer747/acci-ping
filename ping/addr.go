@@ -9,10 +9,9 @@ package ping
 import "net"
 
 type addr struct {
-	ip net.IP
-
 	asUDP *net.UDPAddr
 	asIP  *net.IPAddr
+	ip    net.IP
 }
 
 func New(addrType addressType, ip net.IP) *addr {

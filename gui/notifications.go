@@ -25,9 +25,9 @@ import (
 type Notification[T any] struct {
 	m        *sync.Mutex
 	storage  map[int]stored[T]
-	key      int
 	drawFunc func(terminal.Size, []T) Draw
 	lastSize terminal.Size
+	key      int
 }
 
 // NewNotification builds a new thread safe collection of [T]. The function passed will be called with a

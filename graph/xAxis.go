@@ -23,19 +23,19 @@ import (
 )
 
 type XAxisSpanInfo struct {
-	spans     []*graphdata.SpanInfo
 	spanStats *data.Stats
 	pingStats *data.Stats
 	timeSpan  *data.TimeSpan
+	spans     []*graphdata.SpanInfo
 	startX    int
 	endX      int
 	width     int
 }
 
 type drawingXAxis struct {
-	size        int
-	spans       []*XAxisSpanInfo
 	overallSpan *data.TimeSpan
+	spans       []*XAxisSpanInfo
+	size        int
 }
 
 type xAxisIter struct {

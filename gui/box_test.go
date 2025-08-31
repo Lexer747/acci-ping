@@ -214,11 +214,11 @@ func (tc *testCase) getOutputFileName() string {
 }
 
 type testCase struct {
+	text     []string
+	position gui.Position
 	size     terminal.Size
 	style    gui.Style
-	position gui.Position
 	align    gui.HorizontalAlignment
-	text     []string
 	result   hash
 }
 

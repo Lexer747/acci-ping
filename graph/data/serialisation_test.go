@@ -170,9 +170,9 @@ func testCompacter(t th.T, start, empty data.Compact) {
 }
 
 type FileTest struct {
+	tz              *time.Location
 	FileName        string
 	ExpectedSummary string
-	tz              *time.Location
 }
 
 func (ft FileTest) Run(t *testing.T) {

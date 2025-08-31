@@ -25,26 +25,18 @@ import (
 )
 
 type Graph struct {
-	Term *terminal.Terminal
-
-	ui gui.GUI
-
-	debugStrict bool
-
-	sinkAlive   bool
-	dataChannel <-chan ping.PingResults
-
-	initial ping.PingsPerMinute
-
-	data *graphdata.GraphData
-
-	frameMutex *sync.Mutex
-	lastFrame  frame
-
-	drawingBuffer *draw.Buffer
-
+	ui             gui.GUI
+	Term           *terminal.Terminal
+	dataChannel    <-chan ping.PingResults
+	data           *graphdata.GraphData
+	frameMutex     *sync.Mutex
+	drawingBuffer  *draw.Buffer
 	presentation   *controlState
 	controlChannel <-chan Control
+	lastFrame      frame
+	initial        ping.PingsPerMinute
+	debugStrict    bool
+	sinkAlive      bool
 }
 
 // Control is the signal type which changes the presentation of the graph.
@@ -54,8 +46,8 @@ type Control struct {
 }
 
 type Change[T any] struct {
-	DidChange bool
 	Value     T
+	DidChange bool
 }
 
 // Presentation is the dynamic part of the graph, these only change the presentation of the graph when drawn
@@ -69,23 +61,22 @@ type Presentation struct {
 }
 
 type GraphConfiguration struct {
+	// Gui is the external GUI interface which the terminal will call [gui.Draw] on each frame if the gui
+	// component requires it.
+	Gui gui.GUI
 	// Input will be owned by the graph and represents the source of data for the graph to plot.
 	Input <-chan ping.PingResults
 	// Terminal is the underlying terminal the graph will draw to and perform all external I/O too. The graph
 	// takes ownership of the terminal.
-	Terminal *terminal.Terminal
-	// Gui is the external GUI interface which the terminal will call [gui.Draw] on each frame if the gui
-	// component requires it.
-	Gui            gui.GUI
-	PingsPerMinute ping.PingsPerMinute
+	Terminal      *terminal.Terminal
+	DrawingBuffer *draw.Buffer
+	ControlPlane  <-chan Control
+	// Optional (can be nil)
+	Data           *data.Data
 	URL            string
-	DrawingBuffer  *draw.Buffer
+	PingsPerMinute ping.PingsPerMinute
 	Presentation   Presentation
-	ControlPlane   <-chan Control
 	DebugStrict    bool
-
-	// Optionals:
-	Data *data.Data
 }
 
 func StartUp() {
@@ -288,13 +279,13 @@ func (g *Graph) checkf(shouldBeTrue bool, format string, a ...any) {
 }
 
 type frame struct {
-	PacketCount       int64
-	yAxis             drawingYAxis
 	xAxis             drawingXAxis
+	spinnerData       spinner
 	framePainter      func(io.Writer) error
 	framePainterNoGui func(io.Writer) error
-	spinnerData       spinner
+	yAxis             drawingYAxis
 	cfg               computeFrameConfig
+	PacketCount       int64
 }
 
 func (f frame) Match(s terminal.Size, cfg computeFrameConfig) bool {
@@ -307,7 +298,6 @@ func (f frame) Size() terminal.Size {
 }
 
 type controlState struct {
-	Presentation
-
 	m *sync.Mutex
+	Presentation
 }

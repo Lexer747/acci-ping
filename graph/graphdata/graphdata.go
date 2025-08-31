@@ -25,9 +25,9 @@ import (
 
 type GraphData struct {
 	data      *data.Data
+	m         *sync.Mutex
 	spans     []*SpanInfo
 	spanIndex int
-	m         *sync.Mutex
 }
 
 func NewGraphData(d *data.Data) *GraphData {
@@ -106,9 +106,9 @@ func (gd *GraphData) LockFreeIter(followLatestSpan bool) *Iter {
 }
 
 type Iter struct {
-	Total  int64
 	d      *data.Data
 	spans  Spans
+	Total  int64
 	offset int64
 }
 

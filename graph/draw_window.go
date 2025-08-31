@@ -62,12 +62,11 @@ const (
 )
 
 type label struct {
+	symbol string
+	text   string
 	coords
-
-	symbol      string
-	text        string
-	leftJustify bool
 	colour      colour
+	leftJustify bool
 }
 
 type colour int

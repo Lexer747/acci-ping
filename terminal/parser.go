@@ -142,10 +142,9 @@ type parser struct {
 	Ctx          context.Context
 	ToStreamFrom io.Reader
 	Buffer       []byte
-
-	parserHead  int
-	pointer     int
-	bufferSlice []byte
+	bufferSlice  []byte
+	parserHead   int
+	pointer      int
 }
 
 // Consume the exact bytes passed, errors if the stream produced different bytes.

@@ -163,10 +163,10 @@ func translate(p ping.PingDataPoint, x *XAxisSpanInfo, y drawingYAxis, s termina
 }
 
 type gradientState struct {
+	lastGoodSpan           *XAxisSpanInfo
 	lastGoodIndex          int64
 	lastGoodTerminalWidth  int
 	lastGoodTerminalHeight int
-	lastGoodSpan           *XAxisSpanInfo
 }
 
 func (g gradientState) set(i int64, x, y int, s *XAxisSpanInfo) gradientState {

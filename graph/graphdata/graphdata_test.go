@@ -221,8 +221,8 @@ func (test TimeSpanTest) Run(t *testing.T) {
 
 type TimeSpanFileTest struct {
 	File              string
-	ExpectedSpanCount int
 	ExpectedSpans     []*data.TimeSpan
+	ExpectedSpanCount int
 }
 
 func (test TimeSpanFileTest) Run(t *testing.T) {

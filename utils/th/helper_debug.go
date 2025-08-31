@@ -17,8 +17,8 @@ type debug struct {
 }
 
 type debugItem struct {
-	sequence   []rune
 	command    string
+	sequence   []rune
 	startIndex int
 	endIndex   int
 }

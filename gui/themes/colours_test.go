@@ -48,9 +48,9 @@ green component out of range -3, should be within 0 and 255`)},
 }
 
 type CSSTest struct {
+	Err     error
 	input   string
 	R, G, B uint8
-	Err     error
 }
 
 func (tc CSSTest) Run(t *testing.T) {

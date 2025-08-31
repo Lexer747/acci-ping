@@ -22,16 +22,15 @@ import (
 )
 
 type Ping struct {
+	echoType      icmp.Type
+	echoReply     icmp.Type
 	connect       *icmp.PacketConn
-	addrType      addressType
-	id            uint16
+	addresses     *queryCache
 	currentURL    string
+	addrType      addressType
 	timeout       time.Duration
 	ratelimitTime time.Duration
-
-	echoType, echoReply icmp.Type
-
-	addresses *queryCache
+	id            uint16
 }
 
 // NewPing constructs a new Ping client which can perform accurate ping measurements. Either with
@@ -183,20 +182,20 @@ func (p *Ping) CreateFlexibleChannel(
 }
 
 type PingResults struct {
+	// InternalErr represents some problem with [ping] package internal state which didn't gracefully handle
+	// some network problem. Other network problems which are expected and represent dropped packets **should
+	// be** handled gracefully and will be reported in the [PingDataPoint] field in the [Dropped].
+	InternalErr error
 	// Data is the data about this ping, containing the time taken for round trip or details if the packet was
 	// dropped.
 	Data PingDataPoint
 	// IP is the address which this ping result was achieved from.
 	IP net.IP
-	// InternalErr represents some problem with [ping] package internal state which didn't gracefully handle
-	// some network problem. Other network problems which are expected and represent dropped packets **should
-	// be** handled gracefully and will be reported in the [PingDataPoint] field in the [Dropped].
-	InternalErr error
 }
 
 type PingDataPoint struct {
-	Duration   time.Duration
 	Timestamp  time.Time
+	Duration   time.Duration
 	DropReason Dropped
 }
 

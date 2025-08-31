@@ -7,6 +7,7 @@ linters:
   disable:
     - cyclop
     - durationcheck
+    - embeddedstructfieldcheck # we use [fieldalignment] instead
     - errname
     - exhaustruct
     - forbidigo

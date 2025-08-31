@@ -16,27 +16,26 @@ import (
 )
 
 type AutoComplete struct {
+	FileExt   string
 	Choices   []string
 	WantsFile bool
-	FileExt   string
 }
 
 type Flag struct {
-	// Name is the actual name as it appears on the CLI without the dash.
-	Name string
 	// AutoComplete specifies if the flag has any auto complete options.
 	AutoComplete *AutoComplete
+	// Name is the actual name as it appears on the CLI without the dash.
+	Name string
 }
 
 // FlagSet is an extension of [flag.FlagSet] that enables auto completion providers for a command.
 type FlagSet struct {
 	*flag.FlagSet
 
-	flags    []Flag
-	nameToAc map[string]*AutoComplete
-
-	wantsFile bool
+	nameToAc  map[string]*AutoComplete
 	fileExt   string
+	flags     []Flag
+	wantsFile bool
 }
 
 // NewAutoCompleteFlagSet wraps a [flag.FlagSet] with autocomplete configuration, if [wantsFile] is set then

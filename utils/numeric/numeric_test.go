@@ -21,10 +21,12 @@ import (
 func TestNormalize(t *testing.T) {
 	t.Parallel()
 	type Case struct {
-		Min, Max       float64
-		NewMin, NewMax float64
-		Inputs         []float64
-		Expected       []float64
+		Inputs   []float64
+		Expected []float64
+		Min      float64
+		Max      float64
+		NewMin   float64
+		NewMax   float64
 	}
 	cases := []Case{
 		{

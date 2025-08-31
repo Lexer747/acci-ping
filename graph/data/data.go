@@ -20,13 +20,13 @@ import (
 )
 
 type Data struct {
-	URL         string
 	Header      *Header
 	Network     *Network
+	Runs        *Runs
+	URL         string
 	InsertOrder []DataIndexes
 	Blocks      []*Block
 	TotalCount  int64
-	Runs        *Runs
 	PingsMeta   version
 }
 

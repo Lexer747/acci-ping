@@ -13,8 +13,8 @@ import (
 
 type GUI struct {
 	listeningChars map[rune]terminal.ConditionalListener
-	fallbacks      []terminal.Listener
 	GUIState       *gui.GUIState
+	fallbacks      []terminal.Listener
 }
 
 func newGUIState() *GUI {

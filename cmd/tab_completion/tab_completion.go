@@ -29,8 +29,8 @@ const debug = false
 const AutoCompleteString = "b2827fc8fc8c8267cb15f5a925de7e4712aa04ef2fbd43458326b595d66a36d9" // sha256 of `autoCompleteString`
 
 type Command struct {
-	Cmd string
 	Fs  *tabflags.FlagSet
+	Cmd string
 }
 
 // Run will for a given command line input, write to stdout the autocomplete suggestion for the input [base]

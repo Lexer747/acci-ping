@@ -198,8 +198,8 @@ func (pt pingTimeout) Error() string { return "PingTimeout {" + pt.String() + "}
 
 func (p *Ping) pingRead(ctx context.Context, buffer []byte) (int, error) {
 	type read struct {
-		n   int
 		err error
+		n   int
 	}
 	c := make(chan read)
 	go func() {
@@ -301,9 +301,8 @@ var listenList = []listenerConfig{
 }
 
 type listenerConfig struct {
-	addressType
-
 	network, address string
+	addressType
 }
 
 type addressType int

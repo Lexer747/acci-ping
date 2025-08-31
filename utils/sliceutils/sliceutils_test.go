@@ -67,8 +67,8 @@ func TestSplitN(t *testing.T) {
 
 type testCase[T comparable] struct {
 	Input  []T
-	SplitN int
 	Output [][]T
+	SplitN int
 }
 
 func (tc testCase[T]) Run(t *testing.T) {

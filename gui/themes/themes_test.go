@@ -86,10 +86,10 @@ func CurryTrueColour(r, g, b uint8) func(s string) string {
 }
 
 type AnsiThemeTest struct {
-	Input        string
-	Output       func(s string) string
 	UnmarshalErr error
 	ImplErr      error
+	Output       func(s string) string
+	Input        string
 }
 
 const testString = "abcdefghijklmnopqrstuvwxyz"

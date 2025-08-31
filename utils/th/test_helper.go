@@ -127,20 +127,19 @@ func EmulateTerminal(ansiText string, buffer []string, size terminal.Size, termi
 }
 
 type ansiState struct {
-	cursorRow, cursorColumn int
+	ansiText string
 	// buffer is the in memory representation of the terminal, each entry of the slice is a row.
-	buffer      []string
-	size        terminal.Size
-	ansiText    string
-	asRunes     []rune
-	head        int
-	outOfBounds bool
-
-	terminalWrapping TerminalWrapping
-
+	buffer  []string
+	asRunes []rune
 	// for errors in tests we accumulate this debug object which will store the runes processed to create the
 	// current terminal.
-	debug debug
+	debug            debug
+	size             terminal.Size
+	cursorRow        int
+	cursorColumn     int
+	head             int
+	terminalWrapping TerminalWrapping
+	outOfBounds      bool
 }
 
 func (a *ansiState) peekN(n int) rune     { return a.asRunes[a.head+n] }

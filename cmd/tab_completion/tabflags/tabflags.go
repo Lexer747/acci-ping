@@ -11,6 +11,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/Lexer747/acci-ping/utils/iterutils"
 )
@@ -32,7 +33,9 @@ type Flag struct {
 type FlagSet struct {
 	*flag.FlagSet
 
-	nameToAc  map[string]*AutoComplete
+	nameToAc map[string]*AutoComplete
+	o        *sync.Once
+
 	fileExt   string
 	flags     []Flag
 	wantsFile bool
@@ -48,6 +51,7 @@ func NewAutoCompleteFlagSet(f *flag.FlagSet, wantsFile bool, fileExt string) *Fl
 		nameToAc:  map[string]*AutoComplete{},
 		wantsFile: wantsFile,
 		fileExt:   fileExt,
+		o:         &sync.Once{},
 	}
 }
 
@@ -64,6 +68,7 @@ func (f *FlagSet) FileExt() string {
 // GetAutoCompleteFor returns the autocomplete configuration for the given CLI flag. Returns the nil if the
 // param isn't found or not autocomplete config exists.
 func (f *FlagSet) GetAutoCompleteFor(flagName string) *AutoComplete {
+	f.syncFlagSet()
 	ac, ok := f.nameToAc[strings.TrimPrefix(flagName, "-")]
 	if !ok {
 		return nil
@@ -74,6 +79,7 @@ func (f *FlagSet) GetAutoCompleteFor(flagName string) *AutoComplete {
 // GetNames returns all the names that this flag set knows about, skipping "-debug" prefix unless
 // [includeDebug] is true. Also skips any names in [toSkip].
 func (f *FlagSet) GetNames(includeDebug bool, toSkip []string) []string {
+	f.syncFlagSet()
 	keys := maps.Keys(f.nameToAc)
 	withDash := iterutils.Map(keys, func(n string) string {
 		return "-" + n
@@ -90,6 +96,7 @@ func (f *FlagSet) GetNames(includeDebug bool, toSkip []string) []string {
 }
 
 func (f *FlagSet) Has(flagName string) bool {
+	f.syncFlagSet()
 	_, has := f.nameToAc[strings.TrimPrefix(flagName, "-")]
 	return has
 }
@@ -103,33 +110,6 @@ func (f *FlagSet) String(name string, value string, usage string, ac AutoComplet
 	return ret
 }
 
-// Bool see [FlagSet.Bool]
-//
-// [FlagSet.Bool]: https://pkg.go.dev/flag#Bool
-func (f *FlagSet) Bool(name string, value bool, usage string) *bool {
-	ret := f.FlagSet.Bool(name, value, usage)
-	f.addAc(name, nil)
-	return ret
-}
-
-// Bool see [FlagSet.Float64]
-//
-// [FlagSet.Float64]: https://pkg.go.dev/flag#Float64
-func (f *FlagSet) Float64(name string, value float64, usage string) *float64 {
-	ret := f.FlagSet.Float64(name, value, usage)
-	f.addAc(name, nil)
-	return ret
-}
-
-// Bool see [FlagSet.Int]
-//
-// [FlagSet.Int]: https://pkg.go.dev/flag#Int
-func (f *FlagSet) Int(name string, value int, usage string) *int {
-	ret := f.FlagSet.Int(name, value, usage)
-	f.addAc(name, nil)
-	return ret
-}
-
 func (f *FlagSet) addAc(name string, ac *AutoComplete) {
 	flag := Flag{
 		Name:         name,
@@ -137,4 +117,14 @@ func (f *FlagSet) addAc(name string, ac *AutoComplete) {
 	}
 	f.flags = append(f.flags, flag)
 	f.nameToAc[name] = ac
+}
+
+func (f *FlagSet) syncFlagSet() {
+	f.o.Do(func() {
+		f.VisitAll(func(subFlag *flag.Flag) {
+			if _, alreadyRegistered := f.nameToAc[subFlag.Name]; !alreadyRegistered {
+				f.addAc(subFlag.Name, nil)
+			}
+		})
+	})
 }

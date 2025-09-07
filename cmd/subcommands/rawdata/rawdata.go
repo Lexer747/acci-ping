@@ -37,8 +37,8 @@ func GetFlags() *Config {
 	f.Usage = func() {
 		w := flag.CommandLine.Output()
 		fmt.Fprintf(w, "Usage of %s: reads '.pings' files and outputs the raw data to the stdout\n"+
-			"\t data [-all][-csv] FILES\n\n"+
-			"e.g. %s my_ping_capture.ping\n", os.Args[0], os.Args[0])
+			"\t rawdata [-all][-csv] FILES\n\n"+
+			"e.g. %s rawdata my_ping_capture.ping\n", os.Args[0], os.Args[0])
 		f.PrintDefaults()
 	}
 	return ret

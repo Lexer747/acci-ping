@@ -131,10 +131,7 @@ func (g *Graph) checkGUI() func(io.Writer) error {
 	if state.ShouldDraw() && state.ShouldInvalidate() {
 		return func(w io.Writer) error {
 			defer g.ui.Drawn(state)
-			return errors.Join(
-				onlyGUI(g.drawingBuffer)(w),
-				g.lastFrame.framePainterNoGui(w),
-			)
+			return g.lastFrame.framePainter(w)
 		}
 	} else if state.ShouldDraw() {
 		return func(w io.Writer) error {
@@ -146,11 +143,7 @@ func (g *Graph) checkGUI() func(io.Writer) error {
 	} else if state.ShouldInvalidate() {
 		return func(w io.Writer) error {
 			defer g.ui.Drawn(state)
-			// this doesn't invalidate properly because the graph is transparent.
-			return errors.Join(
-				onlyGUI(g.drawingBuffer)(w),
-				g.lastFrame.framePainterNoGui(w),
-			)
+			return g.lastFrame.framePainter(w)
 		}
 	}
 	return nil

@@ -47,7 +47,7 @@ type PaintUpdate int
 const (
 	None       PaintUpdate = 0b000000000000000
 	Paint      PaintUpdate = 0b000000000000001
-	Invalidate PaintUpdate = 0b000000000000010 // TODO invalidate invalidates all components but should only per remove GUI element
+	Invalidate PaintUpdate = 0b000000000000010
 )
 
 // Paint tells the GUI that a certain update is required.

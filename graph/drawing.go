@@ -28,10 +28,9 @@ import (
 )
 
 type computeFrameConfig struct {
-	timeBetweenFrames time.Duration
-	followLatestSpan  bool
-	drawSpinner       bool
-	yAxisScale        YAxisScale
+	followLatestSpan bool
+	drawSpinner      bool
+	yAxisScale       YAxisScale
 }
 
 func (c computeFrameConfig) Match(cfg computeFrameConfig) bool {
@@ -40,14 +39,6 @@ func (c computeFrameConfig) Match(cfg computeFrameConfig) bool {
 }
 
 const drawingDebug = false
-
-func getTimeBetweenFrames(fps int, pingsPerMinute ping.PingsPerMinute) time.Duration {
-	if fps == 0 {
-		return ping.PingsPerMinuteToDuration(pingsPerMinute)
-	} else {
-		return time.Duration(1000/fps) * time.Millisecond
-	}
-}
 
 var noFrame = func(w io.Writer) error { return nil }
 

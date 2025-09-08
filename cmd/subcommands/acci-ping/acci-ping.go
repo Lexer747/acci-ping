@@ -27,7 +27,6 @@ type Config struct {
 	*application.SharedFlags
 	*tabflags.FlagSet
 
-	debugFps           *int
 	debuggingTermSize  *string
 	filePath           *string
 	followingOnStart   *bool
@@ -69,7 +68,6 @@ func GetFlags(info *application.BuildInfo) *Config {
 		debuggingTermSize: tf.String("debug-term-size", "", "switches the terminal to fixed mode and no iteractivity",
 			tabflags.AutoComplete{Choices: []string{"15x80", "20x85", "HxW"}}),
 		followingOnStart:   tf.Bool("follow", false, "if this flag is used the graph will be shown in following mode immediately"),
-		debugFps:           tf.Int("debug-fps", 240, "configures the internal tickrate for the graph re-paint look (in FPS)"),
 		logarithmicOnStart: tf.Bool("logarithmic", false, "if this flag is used the graph will be shown in logarithmic mode immediately"),
 	}
 	*ret.pingBufferingLimit = 10

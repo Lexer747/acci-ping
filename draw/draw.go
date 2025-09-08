@@ -23,9 +23,6 @@ type Buffer struct {
 }
 
 // TODO paint buffer should be application level and agnostic to the draw buffer itself.
-//
-// TODO this buffering has race conditions, data can be written to the paint buffer while it's being read for
-// painting. A full investigation is required to determine if this is actually a problem.
 func NewPaintBuffer() *Buffer {
 	return newBuffer(int(indexCount.Load()))
 }

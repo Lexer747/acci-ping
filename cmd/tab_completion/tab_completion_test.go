@@ -9,7 +9,9 @@ package tabcompletion
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -37,14 +39,7 @@ func TestGetChoices(t *testing.T) {
 		actual, err := runGetChoices("acci-ping")
 		assert.NilError(t, err)
 
-		expectedFlags := []string{}
-		accipingFlags.Fs.VisitAll(func(f *flag.Flag) {
-			if strings.HasPrefix(f.Name, "debug") {
-				return
-			}
-			expectedFlags = append(expectedFlags, "-"+f.Name)
-		})
-
+		expectedFlags := acciPingNonDebugFlags()
 		assertEqual(t, actual, slices.Concat([]string{"drawframe", "version"}, expectedFlags))
 	})
 	t.Run("start drawframe", func(t *testing.T) {
@@ -70,27 +65,15 @@ func TestGetChoices(t *testing.T) {
 		actual, err := runGetChoices("acci-ping", "-")
 		assert.NilError(t, err)
 
-		expectedFlags := []string{}
-		accipingFlags.Fs.VisitAll(func(f *flag.Flag) {
-			if strings.HasPrefix(f.Name, "debug") {
-				return
-			}
-			expectedFlags = append(expectedFlags, "-"+f.Name)
-		})
+		expectedFlags := acciPingNonDebugFlags()
 		assertEqual(t, actual, expectedFlags)
 	})
-	t.Run("start drawframe ", func(t *testing.T) {
+	t.Run("start drawframe tab", func(t *testing.T) {
 		t.Parallel()
 		actual, err := runGetChoices("acci-ping", "drawframe", "")
 		assert.NilError(t, err)
 
-		expectedFlags := []string{}
-		drawframe.GetFlags(nil).VisitAll(func(f *flag.Flag) {
-			if strings.HasPrefix(f.Name, "debug") {
-				return
-			}
-			expectedFlags = append(expectedFlags, "-"+f.Name)
-		})
+		expectedFlags := drawframeNonDebugFlags()
 		expectedFlags = slices.Concat(expectedFlags, filesByExt(".go"))
 		assertEqual(t, actual, expectedFlags)
 	})
@@ -112,16 +95,17 @@ func TestGetChoices(t *testing.T) {
 		t.Parallel()
 		starting := []string{}
 		accipingFlags.Fs.VisitAll(func(f *flag.Flag) {
-			if strings.HasPrefix(f.Name, "debug") {
+			if strings.HasPrefix(f.Name, "debug") || strings.HasPrefix(f.Name, "file") || strings.HasPrefix(f.Name, "theme") {
 				return
 			}
 			starting = append(starting, "-"+f.Name)
 		})
 		start := sliceutils.TakeRandom(starting)
-		expectedFlags := sliceutils.Remove(starting, start)
+		expectedFlags := sliceutils.Remove(acciPingNonDebugFlags(), start)
 
 		actual, err := runGetChoices("acci-ping", start, "")
 		assert.NilError(t, err)
+		slog.Info(fmt.Sprintf("random selection %q %q", start, starting))
 		assertEqual(t, actual, expectedFlags)
 	})
 	t.Run("start -file", func(t *testing.T) {
@@ -204,7 +188,6 @@ func make_acciping_Flags() Command {
 	_ = tf.String("file", "", "skipped for test",
 		tabflags.AutoComplete{WantsFile: true, FileExt: ".go"})
 	_ = tf.Bool("hide-help", false, "skipped for test")
-	_ = tf.Float64("pings-per-minute", 60.0, "skipped for test")
 	_ = tf.Bool("debug-error-creator", false, "skipped for test")
 	_ = tf.String("url", "www.google.com", "skipped for test", tabflags.AutoComplete{})
 	_ = tf.String("theme", "", "skipped for test",
@@ -249,4 +232,26 @@ func assertEqual(t *testing.T, expected, actual []string) {
 	slices.Sort(actual)
 	slices.Sort(expected)
 	assert.DeepEqual(t, actual, expected)
+}
+
+func acciPingNonDebugFlags() []string {
+	expectedFlags := []string{}
+	accipingFlags.Fs.VisitAll(func(f *flag.Flag) {
+		if strings.HasPrefix(f.Name, "debug") {
+			return
+		}
+		expectedFlags = append(expectedFlags, "-"+f.Name)
+	})
+	return expectedFlags
+}
+
+func drawframeNonDebugFlags() []string {
+	expectedFlags := []string{}
+	drawframe.GetFlags(nil).VisitAll(func(f *flag.Flag) {
+		if strings.HasPrefix(f.Name, "debug") {
+			return
+		}
+		expectedFlags = append(expectedFlags, "-"+f.Name)
+	})
+	return expectedFlags
 }

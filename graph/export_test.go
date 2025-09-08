@@ -24,7 +24,7 @@ func (g *Graph) ComputeFrame() string {
 	painter := g.computeFrame(computeFrameConfig{
 		followLatestSpan: false,
 		drawSpinner:      false,
-		yAxisScale:       g.presentation.YAxisScale,
+		yAxisScale:       g.presentation.Get().YAxisScale,
 	})
 	err := painter(&b)
 	check.NoErr(err, "While painting frame to string buffer")

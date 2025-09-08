@@ -8,7 +8,6 @@ package graphdata
 
 import (
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -65,12 +64,6 @@ func (gd *GraphData) Summary() string {
 	gd.Lock()
 	defer gd.Unlock()
 	return gd.data.Summary()
-}
-
-func (gd *GraphData) AsCompact(w io.Writer) error {
-	gd.m.Lock()
-	defer gd.m.Unlock()
-	return gd.data.AsCompact(w)
 }
 
 func (gd *GraphData) Lock() {

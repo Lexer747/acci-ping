@@ -37,10 +37,8 @@ type Application struct {
 	g    *graph.Graph
 	term *terminal.Terminal
 
-	toUpdate *os.File
-	config   Config
-	// this doesn't need a mutex because we ensure that no two threads have access to the same byte index (I
-	// think this is fine when the slice doesn't grow).
+	toUpdate   *os.File
+	config     Config
 	drawBuffer *draw.Buffer
 
 	errorChannel      chan error
@@ -108,7 +106,7 @@ func (app *Application) Run(
 	defer close(guiControlChannel)
 	defer close(guiSpeedChange)
 	// Very high FPS is good for responsiveness in the UI (since it's locked) and re-drawing on a re-size.
-	graph, cleanup, terminalSizeUpdates, err := app.g.Run(ctx, cancelFunc, *app.config.debugFps, app.listeners(), app.fallbacks)
+	graph, cleanup, terminalSizeUpdates, err := app.g.Run(ctx, cancelFunc, app.listeners(), app.fallbacks)
 	termRecover := func() {
 		_ = app.term.ClearScreen(terminal.UpdateSize)
 		cleanup()

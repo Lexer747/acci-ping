@@ -21,17 +21,19 @@ import (
 	"github.com/Lexer747/acci-ping/gui"
 	"github.com/Lexer747/acci-ping/ping"
 	"github.com/Lexer747/acci-ping/terminal"
+	"github.com/Lexer747/acci-ping/utils/atomic"
 	"github.com/Lexer747/acci-ping/utils/check"
 )
 
 type Graph struct {
-	ui             gui.GUI
-	Term           *terminal.Terminal
-	dataChannel    <-chan ping.PingResults
-	data           *graphdata.GraphData
-	frameMutex     *sync.Mutex
-	drawingBuffer  *draw.Buffer
-	presentation   *controlState
+	ui            gui.GUI
+	Term          *terminal.Terminal
+	dataChannel   <-chan ping.PingResults
+	data          *graphdata.GraphData
+	frameMutex    *sync.Mutex
+	drawingBuffer *draw.Buffer
+
+	presentation   atomic.Of[Presentation]
 	controlChannel <-chan Control
 	lastFrame      frame
 	initial        ping.PingsPerMinute
@@ -104,7 +106,7 @@ func NewGraph(ctx context.Context, cfg GraphConfiguration) *Graph {
 		ui:             cfg.Gui,
 		debugStrict:    cfg.DebugStrict,
 		controlChannel: cfg.ControlPlane,
-		presentation:   &controlState{Presentation: cfg.Presentation, m: &sync.Mutex{}},
+		presentation:   atomic.Init(cfg.Presentation),
 	}
 	if ctx != nil {
 		// A nil context is valid: It means that no new data is expected and the input channel isn't active
@@ -128,12 +130,9 @@ func NewGraph(ctx context.Context, cfg GraphConfiguration) *Graph {
 func (g *Graph) Run(
 	ctx context.Context,
 	stop context.CancelCauseFunc,
-	fps int, // this isn't really an FPS given how the GUI is setup and paint buffers, more like a max re-paint delay timer thing.
 	listeners []terminal.ConditionalListener,
 	fallbacks []terminal.Listener,
 ) (func() error, func(), <-chan terminal.Size, error) {
-	timeBetweenFrames := getTimeBetweenFrames(fps, g.initial)
-	frameRate := time.NewTicker(timeBetweenFrames)
 	cleanup, err := g.Term.StartRaw(ctx, stop, listeners, fallbacks)
 	if err != nil {
 		return nil, cleanup, nil, err
@@ -143,12 +142,14 @@ func (g *Graph) Run(
 		size := g.Term.GetSize()
 		defer close(terminalUpdates)
 		slog.Info("running acci-ping")
+		// The main loop of acci-ping, await on the context (will be fired by the terminal)
 		for {
 			select {
 			case <-ctx.Done():
 				return context.Cause(ctx)
-			case <-frameRate.C:
-				err = g.Term.UpdateSize()
+			default:
+				// The main body of acci-ping, get the terminal size and send on the channel if changed
+				err := g.Term.UpdateSize()
 				if err != nil {
 					return err
 				}
@@ -157,14 +158,17 @@ func (g *Graph) Run(
 					terminalUpdates <- size
 					size = g.Term.GetSize()
 				}
-				g.presentation.m.Lock()
+				// Lock the presentation layer (this ensures we don't get GUI tearing - as in one component
+				// has data from last frame and another component has data from this frame), compute a new
+				// frame. Note that the optimisations to do no drawing are all in this function.
+				p := g.presentation.Get()
 				toWrite := g.computeFrame(computeFrameConfig{
-					timeBetweenFrames: timeBetweenFrames,
-					followLatestSpan:  g.presentation.Following,
-					drawSpinner:       true,
-					yAxisScale:        g.presentation.YAxisScale,
+					followLatestSpan: p.Following,
+					drawSpinner:      true,
+					yAxisScale:       p.YAxisScale,
 				})
-				g.presentation.m.Unlock()
+				// Now that we have a frame to draw (may just be a spinner update), execute this function
+				// writing the painted frame to the terminal.
 				err = toWrite(g.Term)
 				if err != nil {
 					return err
@@ -188,13 +192,12 @@ func (g *Graph) OneFrame() error {
 	if err != nil {
 		return err
 	}
-	g.presentation.m.Lock()
+	p := g.presentation.Get()
 	toWrite := g.computeFrame(computeFrameConfig{
-		followLatestSpan: g.presentation.Following,
+		followLatestSpan: p.Following,
 		drawSpinner:      false,
-		yAxisScale:       g.presentation.YAxisScale,
+		yAxisScale:       p.YAxisScale,
 	})
-	g.presentation.m.Unlock()
 	return toWrite(g.Term)
 }
 
@@ -216,8 +219,6 @@ func (g *Graph) Summarise() string {
 }
 
 func (g *Graph) ClearForPerfTest() {
-	g.presentation.m.Lock()
-	defer g.presentation.m.Unlock()
 	g.lastFrame = frame{spinnerData: spinner{timestampLastDrawn: time.Now()}}
 	g.drawingBuffer = draw.NewPaintBuffer()
 }
@@ -249,22 +250,18 @@ func (g *Graph) handleControl(ctx context.Context) {
 			if !ok {
 				return
 			}
-			// Note we don't need the mutex while reading the values.
 			guiChanged := p.FollowLatestSpan.DidChange || p.YAxisScale.DidChange
-			if guiChanged {
-				// But we do need it while writing
-				g.presentation.m.Lock()
-			}
+			pr := Presentation{}
 			if p.FollowLatestSpan.DidChange {
-				g.presentation.Following = p.FollowLatestSpan.Value
+				pr.Following = p.FollowLatestSpan.Value
 				slog.Info("switching to:", "FollowLatestSpan", p.FollowLatestSpan.Value)
 			}
 			if p.YAxisScale.DidChange {
-				g.presentation.YAxisScale = p.YAxisScale.Value
+				pr.YAxisScale = p.YAxisScale.Value
 				slog.Info("switching to:", "YAxisScale", p.YAxisScale.Value)
 			}
 			if guiChanged {
-				g.presentation.m.Unlock()
+				g.presentation.Set(pr)
 			}
 		}
 	}
@@ -295,9 +292,4 @@ func (f frame) Match(s terminal.Size, cfg computeFrameConfig) bool {
 
 func (f frame) Size() terminal.Size {
 	return terminal.Size{Height: f.xAxis.size, Width: f.yAxis.size}
-}
-
-type controlState struct {
-	m *sync.Mutex
-	Presentation
 }

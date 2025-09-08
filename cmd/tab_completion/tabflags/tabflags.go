@@ -81,6 +81,7 @@ func (f *FlagSet) GetAutoCompleteFor(flagName string) *AutoComplete {
 func (f *FlagSet) GetNames(includeDebug bool, toSkip []string) []string {
 	f.syncFlagSet()
 	keys := maps.Keys(f.nameToAc)
+	// Add the dash first so that we remove items matching [toSkip]
 	withDash := iterutils.Map(keys, func(n string) string {
 		return "-" + n
 	})

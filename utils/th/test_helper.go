@@ -1,10 +1,10 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
-// th stands for "test helper"
+// Package th stands for "test helper"
 package th
 
 import (
@@ -68,12 +68,12 @@ func MakeBuffer(size terminal.Size) []string {
 type TerminalWrapping int
 
 const (
-	// Strict, suitable for graph tests
+	// Panic is strict, suitable for graph tests
 	Panic TerminalWrapping = iota
-	// Rotates the input buffer, essentially representing a scroll down of the terminal output
+	// WrapBuffer rotates the input buffer, essentially representing a scroll down of the terminal output
 	WrapBuffer
-	// Wraps where possible and if out of bounds occurs (i.e. scrolls up too much) will silently drop the
-	// characters
+	// SilentlyDrop wraps where possible and if out of bounds occurs (i.e. scrolls up too much) will silently
+	// drop the characters
 	SilentlyDrop
 )
 

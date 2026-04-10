@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -54,8 +54,6 @@ func (l Luminance) IsLight() bool {
 	return l >= 0.5
 }
 
-// ST1003 acronym soup
-//
 //nolint:staticcheck
 func ParseRGB_48bit(red, green, blue int) Luminance {
 	// 48bit means 16 bits per channel
@@ -66,8 +64,6 @@ func ParseRGB_48bit(red, green, blue int) Luminance {
 	return unsafeCCIR601(r, g, b)
 }
 
-// ST1003 acronym soup
-//
 //nolint:staticcheck
 func ParseRGB_CSSString(s string) (Luminance, error) {
 	r, g, b, err := cssStrToRGB(s)

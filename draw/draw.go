@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -22,6 +22,8 @@ type Buffer struct {
 	storage []*bytes.SafeBuffer
 }
 
+// NewPaintBuffer
+//
 // TODO paint buffer should be application level and agnostic to the draw buffer itself.
 func NewPaintBuffer() *Buffer {
 	return newBuffer(int(indexCount.Load()))
@@ -56,7 +58,8 @@ var (
 	YAxisIndex    = newIndex()
 )
 
-// Z-order is top to bottom so the first item added to ret is at the back, the last item is at the front
+// PaintOrder is the Z-order is top to bottom so the first item added to ret is at the back, the last item is
+// at the front
 var PaintOrder = []Index{
 	// gradient is on the bottom since it's the most "fluffy" part of the presentation, it's interpolated data
 	GradientIndex,

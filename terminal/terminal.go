@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -76,7 +76,11 @@ type Terminal struct {
 // [Terminal.StartRaw] in which it listens for key strokes, it also tries to read the terminal size from the
 // environment on startup.
 func NewTerminal() (*Terminal, error) {
+	//nolint:gosec
+	// G115 the term package we rely on to make raw terminals forces this downcast
 	stdoutIsTerm := term.IsTerminal(int(os.Stdout.Fd()))
+	//nolint:gosec
+	// G115 the term package we rely on to make raw terminals forces this downcast
 	stdErrIsTerm := term.IsTerminal(int(os.Stderr.Fd()))
 	if !(stdoutIsTerm || stdErrIsTerm) {
 		return nil, TermSizeError
@@ -92,7 +96,9 @@ func NewTerminal() (*Terminal, error) {
 		stdin:         os.Stdin,
 		stdout:        os.Stdout,
 		isDynamicSize: true,
-		stdinFd:       int(os.Stdin.Fd()),
+		//nolint:gosec
+		// G115 the term package we rely on to make raw terminals forces this downcast
+		stdinFd: int(os.Stdin.Fd()),
 		terminalSizeCallBack: func() (Size, error) {
 			if stdErrIsTerm {
 				return getCurrentTerminalSize(os.Stderr)
@@ -438,11 +444,15 @@ func (t *Terminal) listen(
 // getCurrentTerminalSize gets the current terminal size or error if the program doesn't have a terminal
 // attached (e.g. go tests).
 func getCurrentTerminalSize(file *os.File) (Size, error) {
+	//nolint:gosec
+	// G115 the term package we rely on to make raw terminals forces this downcast
 	w, h, err := term.GetSize(int(file.Fd()))
 	return Size{Height: h, Width: w}, errors.WrapErr(err, TermSizeError)
 }
 
 func (t *Terminal) supportsRaw(file *os.File) error {
+	//nolint:gosec
+	// G115 the term package we rely on to make raw terminals forces this downcast
 	inFd := int(file.Fd())
 	oldState, makeRawErr := term.MakeRaw(inFd)
 	var restoreErr error

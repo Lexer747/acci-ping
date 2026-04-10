@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -69,13 +69,13 @@ func TitleHighlight(s string) string { return globalTheme.titleHighlight.Do(s) }
 // Positive and DarkPositive are happy path colours indicating some success.
 func Positive(s string) string { return globalTheme.positive.Do(s) }
 
-// Positive and DarkPositive are happy path colours indicating some success.
+// DarkPositive and Positive are happy path colours indicating some success.
 func DarkPositive(s string) string { return globalTheme.darkPositive.Do(s) }
 
 // Negative and DarkNegative are sad path colours indicating some failure or "bad" values.
 func Negative(s string) string { return globalTheme.negative.Do(s) }
 
-// Negative and DarkNegative are sad path colours indicating some failure or "bad" values.
+// DarkNegative and Negative are sad path colours indicating some failure or "bad" values.
 func DarkNegative(s string) string { return globalTheme.darkNegative.Do(s) }
 
 // LookupTheme will search through the built-in themes and return one if found, or false.

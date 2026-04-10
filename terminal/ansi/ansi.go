@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -53,11 +53,11 @@ type ED int // Erase in Display
 type EL int // Erase in Line
 
 const (
-	// Control Sequence Introducer | Starts most of the useful sequences, terminated by a byte in the range
+	// CSI = Control Sequence Introducer | Starts most of the useful sequences, terminated by a byte in the range
 	// 0x40 through 0x7E.
 	CSI = "\033["
 
-	// Operating System Commands | Does other things not as well documented.
+	// OSC = Operating System Commands | Does other things not as well documented.
 	OSC = "\x1b]"
 
 	CursorToScreenEnd         ED = 0
@@ -75,7 +75,7 @@ const (
 	ShowCursor      = CSI + "?25h"
 )
 
-// Compacted when defaults are passed, some chars may be elided:
+// CursorPosition compacted when defaults are passed, some chars may be elided:
 //
 // > The values are 1-based, and default to '1' (top left corner) if omitted. A sequence such as 'CSI ;5H' is
 // > a synonym for 'CSI 1;5H' as well as 'CSI 17;H' is the same as 'CSI 17H' and 'CSI 17;1H'. [wikipedia]

@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -45,7 +45,7 @@ func NotNil(ptr any, assertMsg string) {
 	Check(asIntPtr != 0, assertMsg)
 }
 
-// NotNil asserts that the given pointer is not nil, otherwise this is assumed to be an unrecoverable error
+// NotNilf asserts that the given pointer is not nil, otherwise this is assumed to be an unrecoverable error
 // and will result in a panic. Usually a nicer panic than just dereferencing the nil pointer. Formats the
 // message according to normal go printf semantics.
 func NotNilf(ptr any, format string, a ...any) {
@@ -60,7 +60,7 @@ func NoErr(err error, msg string) {
 	Checkf(err == nil, "%s: %s", msg, err)
 }
 
-// NoErr asserts that the given error is in fact nil, if it is not error then it's assumed to be an
+// NoErrf asserts that the given error is in fact nil, if it is not error then it's assumed to be an
 // unrecoverable error and will result in a panic. Formatting the message according normal go printf
 // semantics.
 func NoErrf(err error, format string, args ...any) {

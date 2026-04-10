@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -235,7 +235,7 @@ func generatePositions() []gui.Position {
 		{Top: 0, Bottom: 1, Left: 1, Right: 0},
 		{Top: 0, Bottom: 2, Left: 2, Right: 0},
 	}
-	positions := []gui.Position{}
+	positions := make([]gui.Position, 0, len(paddings)*len(verAlignments)*len(hozAlignments))
 	for _, hoz := range hozAlignments {
 		for _, ver := range verAlignments {
 			for _, padding := range paddings {

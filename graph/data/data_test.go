@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -183,7 +183,7 @@ func TestStats(t *testing.T) {
 	}
 }
 
-func assertStatsEqual(t *testing.T, expected data.Stats, actual data.Stats, sigFigs int, msgAndArgs ...interface{}) {
+func assertStatsEqual(t *testing.T, expected data.Stats, actual data.Stats, sigFigs int, msgAndArgs ...any) {
 	t.Helper()
 	th.AssertFloatEqual(t, expected.Mean, actual.Mean, sigFigs, msgAndArgs...)
 	th.AssertFloatEqual(t, expected.Variance, actual.Variance, sigFigs, msgAndArgs...)
@@ -193,7 +193,7 @@ func assertStatsEqual(t *testing.T, expected data.Stats, actual data.Stats, sigF
 	}
 }
 
-func assertTimeSpanEqual(t *testing.T, expected data.TimeSpan, actual data.TimeSpan, msgAndArgs ...interface{}) {
+func assertTimeSpanEqual(t *testing.T, expected data.TimeSpan, actual data.TimeSpan, msgAndArgs ...any) {
 	t.Helper()
 	assert.Check(t, is.DeepEqual(expected.Begin, actual.Begin), msgAndArgs...)
 	assert.Check(t, is.DeepEqual(expected.End, actual.End), msgAndArgs...)
@@ -499,7 +499,7 @@ func TestDataOrdering(t *testing.T) {
 				inc++
 				return ping.PingResults{
 					Data:        p.Data,
-					IP:          net.IPv4(byte(inc), 0, 0, 0),
+					IP:          net.IPv4(byte(inc), 0, 0, 0), //nolint:gosec
 					InternalErr: nil,
 				}
 			}),
@@ -512,7 +512,7 @@ func TestDataOrdering(t *testing.T) {
 				x := rand.Int32() //nolint:gosec
 				return ping.PingResults{
 					Data:        p.Data,
-					IP:          net.IPv4(byte(x), byte(x>>8), byte(x>>16), byte(x>>24)),
+					IP:          net.IPv4(byte(x), byte(x>>8), byte(x>>16), byte(x>>24)), //nolint:gosec
 					InternalErr: nil,
 				}
 			}),

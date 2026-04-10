@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -17,7 +17,7 @@ var Is = stderrors.Is
 var Join = stderrors.Join
 var Unwrap = stderrors.Unwrap
 
-func Errorf(format string, args ...interface{}) error {
+func Errorf(format string, args ...any) error {
 	return New(fmt.Sprintf(format, args...))
 }
 
@@ -28,7 +28,7 @@ func Wrap(err error, wrapping string) error {
 	return &wrapErr{cause: err, messageErr: New(wrapping)}
 }
 
-func Wrapf(err error, format string, args ...interface{}) error {
+func Wrapf(err error, format string, args ...any) error {
 	return Wrap(err, fmt.Sprintf(format, args...))
 }
 

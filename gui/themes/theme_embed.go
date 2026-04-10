@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -284,7 +284,7 @@ func (cj *colourJSON) impl() (colourImpl, error) {
 func (tj themeJSON) Theme() (Theme, error) {
 	// the actual json colours may have json unmarshaled "ok" but contain bogus data in which case we will
 	// get a descriptive error here about that.
-	errs := []error{}
+	errs := make([]error, 0, 9)
 	primary, err := tj.Colours.Primary.impl()
 	errs = append(errs, errors.Wrap(err, "primary"))
 	secondary, err := tj.Colours.Secondary.impl()

@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -35,7 +35,7 @@ func GetFlags() *Config {
 	return ret
 }
 
-// A very basic demo and use of the library, pings google.com 4 times.
+// RunPing is a very basic demo and use of the library, pings google.com 4 times.
 func RunPing(c *Config) {
 	check.Check(c.Parsed(), "flags not parsed")
 	p := ping.NewPing()

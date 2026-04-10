@@ -8,6 +8,8 @@ package graphdata
 
 import (
 	"fmt"
+	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +40,7 @@ func NewGraphData(d *data.Data) *GraphData {
 	for i := range d.TotalCount {
 		g.addPointToSpans(d.Get(i), i)
 	}
+	slog.Info("Testing", "spans", g.spans)
 	return g
 }
 
@@ -142,35 +145,21 @@ func NewSpanInfo() *SpanInfo {
 	}
 }
 
+func (si *SpanInfo) String() string {
+	var b strings.Builder
+	b.WriteString("{")
+	fmt.Fprintf(&b, "SpanStats: %q", si.SpanStats.String())
+	b.WriteString(",")
+	fmt.Fprintf(&b, "PingStats: %q", si.PingStats.String())
+	b.WriteString(",")
+	fmt.Fprintf(&b, "LastPoint: %s", si.LastPoint.String())
+	b.WriteString(",")
+	fmt.Fprintf(&b, "Count: %d, Start: %d, End: %d", si.Count, si.start, si.end)
+	b.WriteString("}")
+	return b.String()
+}
+
 func (si *SpanInfo) AddPoint(p ping.PingDataPoint, index int64) bool {
-	const debug = false
-	switch si.Count {
-	case 0:
-		si.addFirstPoint(p, index)
-		return false
-	case 1:
-		si.add(p, index)
-		return false
-	case 2:
-		// When we have exactly two packets this is the third packet we are adding in which case we won't have
-		// a variance yet only mean.
-		gap := p.Timestamp.Sub(si.LastPoint.Timestamp)
-		if float64(gap) > si.SpanStats.Mean*allowedMeanWhenTwoPoints {
-			if debug {
-				fmt.Printf(
-					"Case 1 | %s -> %s, (%s) > Mean (%s)*%f\n",
-					si.LastPoint.Timestamp.String(),
-					p.Timestamp.String(),
-					gap.String(),
-					time.Duration(si.SpanStats.Mean).String(),
-					allowedMeanWhenTwoPoints,
-				)
-			}
-			return true
-		}
-		si.add(p, index)
-		return false
-	}
 	// Problem statement:
 	//
 	// We want to determine if a given new point is essentially from a new sampling domain. The main use case
@@ -187,55 +176,25 @@ func (si *SpanInfo) AddPoint(p ping.PingDataPoint, index int64) bool {
 	//
 	// Solution:
 	//
-	// We record the difference in timestamps into a [data.Stats] struct which will work out the statistical
-	// nature of the current sampling, if we detect the next point is some outlier then we consider a new
-	// span. Where outlier is a flexible definition to just mean whatever is the best heuristic for pretty
-	// graphs.
-	gap := p.Timestamp.Sub(si.LastPoint.Timestamp)
-	std := allowedStandardDeviations
-	if p.Dropped() {
-		// At low ping rate this might be too high, given a reasonable 1 ping/minute, a 1s timeout is
-		// completely reasonable in which case this should just stay as 3 stds away. Scale this somehow?
-		std = allowedDroppedStandardDeviations
-	}
-	if float64(gap) > si.SpanStats.Mean+(si.SpanStats.StandardDeviation*std) && si.SpanStats.StandardDeviation != 0.0 {
-		// This gap is officially too big, don't add this point.
-		// TODO account for very early small stats with low confidence
-		if debug {
-			fmt.Printf(
-				"Case 2 | %s -> %s, (%s) > %s+(%s*%f)\n",
-				si.LastPoint.Timestamp.String(),
-				p.Timestamp.String(),
-				gap.String(),
-				time.Duration(si.SpanStats.Mean).String(),
-				time.Duration(si.SpanStats.StandardDeviation).String(),
-				std,
-			)
+	// Just set the largest allow gap between two consecutive samples to be 10 minutes.
+	switch si.Count {
+	case 0:
+		si.addFirstPoint(p, index)
+		return false
+	case 1:
+		si.add(p, index)
+		return false
+	default:
+		// When we have exactly two packets this is the third packet we are adding in which case we won't have
+		// a variance yet only mean.
+		gap := p.Timestamp.Sub(si.LastPoint.Timestamp)
+		if gap > 5*time.Minute {
+			return true
 		}
-		return true
-	} else if float64(gap) > si.SpanStats.Mean*2.0 && si.SpanStats.StandardDeviation == 0.0 {
-		if debug {
-			fmt.Printf(
-				"Case 3 | %s -> %s, (%s) > Zero %s+(%s*%f)\n",
-				si.LastPoint.Timestamp.String(),
-				p.Timestamp.String(),
-				gap.String(),
-				time.Duration(si.SpanStats.Mean).String(),
-				time.Duration(si.SpanStats.StandardDeviation).String(),
-				std,
-			)
-		}
-		return true
-	} else {
-		// This gap is small enough add it to this span
 		si.add(p, index)
 		return false
 	}
 }
-
-const allowedStandardDeviations = 4.0
-const allowedDroppedStandardDeviations = 9.0
-const allowedMeanWhenTwoPoints = 7.0
 
 func (si *SpanInfo) addFirstPoint(p ping.PingDataPoint, index int64) {
 	si.TimeSpan = &data.TimeSpan{Begin: p.Timestamp, End: p.Timestamp}

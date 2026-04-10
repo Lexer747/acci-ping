@@ -159,7 +159,7 @@ func combineSpansPixelWise(spans []*graphdata.SpanInfo, startingWidth, total int
 	retSpans := make([]*XAxisSpanInfo, 0, len(spans))
 	// TODO make this configurable - right now we just use a percentage of the start width or 5 when the
 	// screen is small.
-	minPixels := max(int(float64(startingWidth)*0.05), 5)
+	minPixels := 0 // max(int(float64(startingWidth)*0.05), 1)
 	acc := 0.0
 	idx := 0
 	for _, span := range spans {

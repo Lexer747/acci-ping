@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -88,13 +88,14 @@ func computeYAxis(
 		h := i + 2
 		fmt.Fprint(toWriteTo, ansi.CursorPosition(h, 1))
 		if i%gapSize == 1 {
+			minY, maxY := effectiveYBounds(stats)
 			var scaledDuration float64
 			switch scale {
 			case Linear:
-				scaledDuration = numeric.NormalizeToRange(float64(i+1), float64(size.Height-3), 2, float64(stats.Min), float64(stats.Max))
+				scaledDuration = numeric.NormalizeToRange(float64(i+1), float64(size.Height-3), 2, float64(minY), float64(maxY))
 			case Logarithmic:
-				logMin := math.Log(float64(stats.Min))
-				logMax := math.Log(float64(stats.Max))
+				logMin := math.Log(float64(minY))
+				logMax := math.Log(float64(maxY))
 				logScaledTime := numeric.NormalizeToRange(float64(i+1), float64(size.Height-3), 2, logMin, logMax)
 				scaledDuration = math.Pow(math.E, logScaledTime)
 			}
@@ -114,23 +115,37 @@ func computeYAxis(
 	}
 }
 
+// effectiveYBounds is a graph specific view over the stats, normally if min and max are equal
+// that's not a problem, but its an issue for graphs so hence this wrapper layer to avoid NaNs and
+// infs.
+func effectiveYBounds(s *data.Stats) (minY, maxY time.Duration) {
+	// stats are different always return them.
+	if s.Min != s.Max {
+		return s.Min, s.Max
+	}
+	// the same min and max so avoid degenerate divide by zero problems, create fake min-max by
+	// enlarging and shrinking the current value.
+	return s.Min / 2, s.Min * 2
+}
+
 func getY(dur time.Duration, yAxis drawingYAxis, s terminal.Size) int {
 	newMin := max(1, s.Height-2)
 	newMax := min(2, s.Height)
+	minY, maxY := effectiveYBounds(yAxis.stats)
 	switch yAxis.scale {
 	case Linear:
 		return int(numeric.NormalizeToRange(
 			float64(dur),
-			float64(yAxis.stats.Min),
-			float64(yAxis.stats.Max),
+			float64(minY),
+			float64(maxY),
 			float64(newMin),
 			float64(newMax),
 		))
 	case Logarithmic:
 		return int(numeric.NormalizeToRange(
 			math.Log(float64(dur)),
-			math.Log(float64(yAxis.stats.Min)),
-			math.Log(float64(yAxis.stats.Max)),
+			math.Log(float64(minY)),
+			math.Log(float64(maxY)),
 			float64(newMin),
 			float64(newMax),
 		))

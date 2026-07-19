@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -226,4 +226,23 @@ func produceFrame(
 	defer func() { stdin.WriteCtrlC(t) }()
 	output := th.MakeBuffer(size)
 	return th.EmulateTerminal(g.ComputeFrame(), output, size, terminalWrapping)
+}
+
+func TestEqualDurations(t *testing.T) {
+	t.Parallel()
+	d := data.NewData("example.com")
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Several good packets, all identical duration -> stats.Min == stats.Max
+	for i := range 20 {
+		d.AddPoint(ping.PingResults{
+			Data: ping.PingDataPoint{
+				Duration:  13 * time.Millisecond,
+				Timestamp: base.Add(time.Duration(i) * time.Second),
+			},
+		})
+	}
+	// test is simply not to panic:
+	size := terminal.Size{Height: 32, Width: 216}
+	_ = produceFrame(t, size, d, graph.Linear, th.TerminalWrapping(0))
+	_ = produceFrame(t, size, d, graph.Logarithmic, th.TerminalWrapping(0))
 }

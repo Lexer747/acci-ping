@@ -174,7 +174,7 @@ func (tc *testCase) Run(t *testing.T) {
 		Position: tc.position,
 		Style:    tc.style,
 	}
-	buffer := bytes.NewSafeBuffer()
+	buffer := bytes.NewConcurrentBuf()
 	testBox.Draw(tc.size, buffer)
 	b := th.MakeBuffer(tc.size)
 	result := th.EmulateTerminal(buffer.String(), b, tc.size, th.SilentlyDrop)

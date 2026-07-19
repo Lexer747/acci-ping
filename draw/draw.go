@@ -19,7 +19,7 @@ import (
 // allocate for drawing is bounded for the amount of the single largest frame we ever draw. This has huge
 // performance improvements over creating string literals because it's gets the GC out of our way.
 type Buffer struct {
-	storage []*bytes.SafeBuffer
+	storage []*bytes.ConcurrentBuf
 }
 
 // NewPaintBuffer
@@ -32,7 +32,7 @@ func NewPaintBuffer() *Buffer {
 type Index int
 
 // Get the underlying buffer for this z-index
-func (b *Buffer) Get(z Index) *bytes.SafeBuffer {
+func (b *Buffer) Get(z Index) *bytes.ConcurrentBuf {
 	return b.storage[z]
 }
 
@@ -97,10 +97,10 @@ var GUIIndexes = sliceutils.Remove(PaintOrder, GraphIndexes...)
 // newBuffer creates a new [Buffer] of [n] z-buffers.
 func newBuffer(zMax int) *Buffer {
 	ret := &Buffer{
-		storage: make([]*bytes.SafeBuffer, zMax),
+		storage: make([]*bytes.ConcurrentBuf, zMax),
 	}
 	for i := range zMax {
-		ret.storage[i] = bytes.NewSafeBuffer()
+		ret.storage[i] = bytes.NewConcurrentBuf()
 	}
 	return ret
 }

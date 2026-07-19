@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -93,7 +93,7 @@ func drawWindowStartUp() {
 var drop string
 var dropFiller string
 
-func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.SafeBuffer) {
+func (dw *drawWindow) draw(toWrite, toWriteGradient, toWriteDropped *bytes.ConcurrentBuf) {
 	// These can be indeterministically (map order) drawn since we guarantee uniqueness of the coords,
 	// therefore meaning no map [drawnData] will ever contain the same coords which have different ping counts
 	for c, point := range dw.cache {
@@ -305,7 +305,7 @@ func (dw *drawWindow) getOverlap(x, y int) string {
 
 // getKey will write to the draw buffer the key needed for this draw window, where is minimizes the amount of
 // text needed to show the key for all the points drawn.
-func (dw *drawWindow) getKey(toWriteTo *bytes.SafeBuffer) {
+func (dw *drawWindow) getKey(toWriteTo *bytes.ConcurrentBuf) {
 	if dw.max > loadsThreshold {
 		fmt.Fprintf(toWriteTo, themes.Secondary("Key")+themes.Primary(": ")+
 			single+" = %d "+bar+" "+few+" = %d-%d "+bar+" "+many+" = %d-%d "+bar+" "+loads+" = %d+    ",

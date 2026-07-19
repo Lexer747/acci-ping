@@ -69,7 +69,7 @@ var padding string
 var origin string
 
 func computeXAxis(
-	toWriteTo, toWriteSpanBars *bytes.SafeBuffer,
+	toWriteTo, toWriteSpanBars *bytes.ConcurrentBuf,
 	s terminal.Size,
 	overall *data.TimeSpan,
 	spans []*graphdata.SpanInfo,
@@ -213,7 +213,7 @@ func combineSpansPixelWise(spans []*graphdata.SpanInfo, startingWidth, total int
 	return retSpans
 }
 
-func xAxisDrawTimes(b *bytes.SafeBuffer, times []string, budget int, padding string) {
+func xAxisDrawTimes(b *bytes.ConcurrentBuf, times []string, budget int, padding string) {
 	// Drop trailing labels that don't fit: overflowing [budget] would misalign every span to our right (#18).
 	labelCols := 0
 	kept := 0
@@ -248,7 +248,7 @@ func xAxisDrawTimes(b *bytes.SafeBuffer, times []string, budget int, padding str
 	}
 }
 
-func writePadding(b *bytes.SafeBuffer, n int, padding string) {
+func writePadding(b *bytes.ConcurrentBuf, n int, padding string) {
 	for range n {
 		b.WriteString(padding)
 	}

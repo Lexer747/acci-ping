@@ -4,10 +4,10 @@ ROOT=$(git rev-parse --show-toplevel)
 pushd "$ROOT" &> /dev/null || exit
 
 
-fieldalignment ./... &> /dev/null
+go tool fieldalignment ./... &> /dev/null
 exitCode=$?
 if [[ $exitCode != 0 ]]; then
-    fieldalignment -fix -diff ./...
+    go tool fieldalignment -fix -diff ./...
 else
     echo "fieldalignment good :)"
 fi

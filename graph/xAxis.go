@@ -91,7 +91,7 @@ func computeXAxis(
 				timeSpan:  singleSpans[0].TimeSpan,
 				startX:    1,
 				endX:      s.Width,
-				width:     s.Width,
+				width:     space,
 			},
 		}
 		overall = singleSpans[0].TimeSpan

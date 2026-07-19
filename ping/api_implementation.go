@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -10,6 +10,7 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -157,12 +158,10 @@ func (p *Ping) pingOnChannel(
 		return true
 	}
 	begin := time.Now()
-	timeoutErr := pingTimeout{Duration: p.timeout}
-	timeoutCtx, cancel := context.WithTimeoutCause(ctx, timeoutErr.Duration, timeoutErr)
-	defer cancel()
-	n, err := p.pingRead(timeoutCtx, buffer)
+	n, err := p.pingRead(ctx, begin.Add(p.timeout), buffer)
 	duration := time.Since(begin)
-	if err != nil && errors.Is(err, timeoutErr) {
+	var timeout pingTimeout
+	if err != nil && errors.As(err, &timeout) {
 		client <- packetLoss(selected.ip, timestamp, Timeout)
 		return true
 	} else if err != nil {
@@ -195,23 +194,37 @@ type pingTimeout struct {
 }
 
 func (pt pingTimeout) Error() string { return "PingTimeout {" + pt.String() + "}" }
+func (pt pingTimeout) Unwrap() error { return os.ErrDeadlineExceeded }
 
-func (p *Ping) pingRead(ctx context.Context, buffer []byte) (int, error) {
-	type read struct {
-		err error
-		n   int
-	}
-	c := make(chan read)
-	go func() {
-		n, _, err := p.connect.ReadFrom(buffer)
-		c <- read{n: n, err: err}
-	}()
-	select {
-	case <-ctx.Done():
-		err := context.Cause(ctx)
+// providing [pingTimeout.Unwrap] lets calles use normal [errors.Is] to determine if a socket/os
+// level timeout has occurred instead of a user cancellation.
+
+// pingRead performs a single blocking read from the connection, bounded by [deadline]. Expiring the
+// deadline aborts the read at the socket, so a timed-out read never leaks a reader goroutine nor
+// steals the reply belonging to a subsequent ping. A cancellation of [ctx] also unblocks the read
+// by collapsing the deadline, and is surfaced as the context's cause; a genuine timeout is surfaced
+// as the package's [pingTimeout] sentinel.
+func (p *Ping) pingRead(ctx context.Context, deadline time.Time, buffer []byte) (int, error) {
+	err := p.connect.SetReadDeadline(deadline)
+	if err != nil {
 		return 0, err
-	case success := <-c:
-		return success.n, success.err
+	}
+	stop := context.AfterFunc(ctx, func() {
+		// Collapse the deadline so the in-flight ReadFrom returns immediately on cancellation.
+		_ = p.connect.SetReadDeadline(time.Now())
+	})
+	defer stop()
+	n, _, err := p.connect.ReadFrom(buffer)
+	switch {
+	case err == nil:
+		return n, nil
+	case ctx.Err() != nil:
+		// Parent asked us to stop; surface its cause rather than a spurious timeout.
+		return 0, context.Cause(ctx)
+	case errors.Is(err, os.ErrDeadlineExceeded):
+		return 0, pingTimeout{Duration: p.timeout}
+	default:
+		return n, err
 	}
 }
 

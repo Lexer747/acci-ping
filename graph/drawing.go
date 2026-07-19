@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -171,7 +171,7 @@ func (g gradientState) draw() bool {
 
 func computeFrame(
 	g *Graph,
-	toWriteGradientTo, toWriteTo, toWriteDroppedTo, toWriteKeyTo *bytes.SafeBuffer,
+	toWriteGradientTo, toWriteTo, toWriteDroppedTo, toWriteKeyTo *bytes.ConcurrentBuf,
 	iter *graphdata.Iter,
 	runs *data.Runs,
 	xAxis drawingXAxis,
@@ -313,7 +313,7 @@ func shouldGradient(runs *data.Runs) bool {
 	return runs.GoodPackets.Longest > 2
 }
 
-func makeTitle(toWriteTo *bytes.SafeBuffer, size terminal.Size, stats *data.Stats, url string) {
+func makeTitle(toWriteTo *bytes.ConcurrentBuf, size terminal.Size, stats *data.Stats, url string) {
 	const yAxisTitle = "Ping "
 	sizeStr := size.String()
 	titleBegin := themes.Emphasis(url)

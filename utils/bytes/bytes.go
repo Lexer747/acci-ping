@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -36,29 +36,28 @@ func HexPrint(buffer []byte) string {
 	return b.String()
 }
 
-// SafeBuffer is a wrapped [bytes.Buffer] with a read-write-mutex, this guards the underlying mutex from
-// invalid concurrent access making it thread safe. The zero value is not safe use [NewSafeBuffer] instead.
-//
-// This is not safe in regards to out of bounds writes and running out of memory or memory safety in general.
-type SafeBuffer struct {
+// ConcurrentBuf is a wrapped [bytes.Buffer] with a read-write-mutex, this guards the underlying
+// mutex from invalid concurrent access making it thread safe. The zero value is not safe use
+// [NewConcurrentBuf] instead.
+type ConcurrentBuf struct {
 	b *bytes.Buffer
 	m *sync.RWMutex
 }
 
-func NewSafeBuffer() *SafeBuffer {
-	return &SafeBuffer{
+func NewConcurrentBuf() *ConcurrentBuf {
+	return &ConcurrentBuf{
 		b: &bytes.Buffer{},
 		m: &sync.RWMutex{},
 	}
 }
-func NewExistingSafeBuffer(buf []byte) *SafeBuffer {
-	return &SafeBuffer{
+func ConcurrentBufFromBytes(buf []byte) *ConcurrentBuf {
+	return &ConcurrentBuf{
 		b: bytes.NewBuffer(buf),
 		m: &sync.RWMutex{},
 	}
 }
-func NewSafeBufferString(s string) *SafeBuffer {
-	return &SafeBuffer{
+func ConcurrentBufFromString(s string) *ConcurrentBuf {
+	return &ConcurrentBuf{
 		b: bytes.NewBufferString(s),
 		m: &sync.RWMutex{},
 	}
@@ -71,7 +70,7 @@ func NewSafeBufferString(s string) *SafeBuffer {
 // future reads.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) Bytes() []byte {
+func (b *ConcurrentBuf) Bytes() []byte {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.Bytes()
@@ -83,7 +82,7 @@ func (b *SafeBuffer) Bytes() []byte {
 // The buffer is only valid until the next write operation on b.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) AvailableBuffer() []byte {
+func (b *ConcurrentBuf) AvailableBuffer() []byte {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.AvailableBuffer()
@@ -95,7 +94,7 @@ func (b *SafeBuffer) AvailableBuffer() []byte {
 // To build strings more efficiently, see the [strings.Builder] type.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) String() string {
+func (b *ConcurrentBuf) String() string {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.String()
@@ -105,7 +104,7 @@ func (b *SafeBuffer) String() string {
 // b.Len() == len(b.Bytes()).
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) Len() int {
+func (b *ConcurrentBuf) Len() int {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.Len()
@@ -115,7 +114,7 @@ func (b *SafeBuffer) Len() int {
 // total space allocated for the buffer's data.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) Cap() int {
+func (b *ConcurrentBuf) Cap() int {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.Cap()
@@ -124,7 +123,7 @@ func (b *SafeBuffer) Cap() int {
 // Available returns how many bytes are unused in the buffer.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) Available() int {
+func (b *ConcurrentBuf) Available() int {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.Available()
@@ -135,7 +134,7 @@ func (b *SafeBuffer) Available() int {
 // It panics if n is negative or greater than the length of the buffer.
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) Truncate(n int) {
+func (b *ConcurrentBuf) Truncate(n int) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	b.b.Truncate(n)
@@ -146,7 +145,7 @@ func (b *SafeBuffer) Truncate(n int) {
 // Reset is the same as [Buffer.Truncate](0).
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) Reset() {
+func (b *ConcurrentBuf) Reset() {
 	b.m.Lock()
 	defer b.m.Unlock()
 	b.b.Reset()
@@ -159,7 +158,7 @@ func (b *SafeBuffer) Reset() {
 // If the buffer can't grow it will panic with [ErrTooLarge].
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) Grow(n int) {
+func (b *ConcurrentBuf) Grow(n int) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	b.b.Grow(n)
@@ -170,7 +169,7 @@ func (b *SafeBuffer) Grow(n int) {
 // buffer becomes too large, Write will panic with [ErrTooLarge].
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) Write(p []byte) (n int, err error) {
+func (b *ConcurrentBuf) Write(p []byte) (n int, err error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.Write(p)
@@ -181,7 +180,7 @@ func (b *SafeBuffer) Write(p []byte) (n int, err error) {
 // buffer becomes too large, WriteString will panic with [ErrTooLarge].
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) WriteString(s string) (n int) {
+func (b *ConcurrentBuf) WriteString(s string) (n int) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	n, _ = b.b.WriteString(s)
@@ -194,7 +193,7 @@ func (b *SafeBuffer) WriteString(s string) (n int) {
 // buffer becomes too large, ReadFrom will panic with [ErrTooLarge].
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) ReadFrom(r io.Reader) (n int64, err error) {
+func (b *ConcurrentBuf) ReadFrom(r io.Reader) (n int64, err error) {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.ReadFrom(r)
@@ -206,7 +205,7 @@ func (b *SafeBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 // encountered during the write is also returned.
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) WriteTo(w io.Writer) (n int64, err error) {
+func (b *ConcurrentBuf) WriteTo(w io.Writer) (n int64, err error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.WriteTo(w)
@@ -218,7 +217,7 @@ func (b *SafeBuffer) WriteTo(w io.Writer) (n int64, err error) {
 // [ErrTooLarge].
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) WriteByte(c byte) error {
+func (b *ConcurrentBuf) WriteByte(c byte) error {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.WriteByte(c)
@@ -230,7 +229,7 @@ func (b *SafeBuffer) WriteByte(c byte) error {
 // if it becomes too large, WriteRune will panic with [ErrTooLarge].
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) WriteRune(r rune) (n int, err error) {
+func (b *ConcurrentBuf) WriteRune(r rune) (n int, err error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.WriteRune(r)
@@ -242,7 +241,7 @@ func (b *SafeBuffer) WriteRune(r rune) (n int, err error) {
 // otherwise it is nil.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) Read(p []byte) (n int, err error) {
+func (b *ConcurrentBuf) Read(p []byte) (n int, err error) {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.Read(p)
@@ -254,7 +253,7 @@ func (b *SafeBuffer) Read(p []byte) (n int, err error) {
 // The slice is only valid until the next call to a read or write method.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) Next(n int) []byte {
+func (b *ConcurrentBuf) Next(n int) []byte {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.Next(n)
@@ -264,7 +263,7 @@ func (b *SafeBuffer) Next(n int) []byte {
 // If no byte is available, it returns error [io.EOF].
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) ReadByte() (byte, error) {
+func (b *ConcurrentBuf) ReadByte() (byte, error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.ReadByte()
@@ -277,7 +276,7 @@ func (b *SafeBuffer) ReadByte() (byte, error) {
 // consumes one byte and returns U+FFFD, 1.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) ReadRune() (r rune, size int, err error) {
+func (b *ConcurrentBuf) ReadRune() (r rune, size int, err error) {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.ReadRune()
@@ -290,7 +289,7 @@ func (b *SafeBuffer) ReadRune() (r rune, size int, err error) {
 // from any read operation.)
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) UnreadRune() error {
+func (b *ConcurrentBuf) UnreadRune() error {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.UnreadRune()
@@ -301,7 +300,7 @@ func (b *SafeBuffer) UnreadRune() error {
 // read zero bytes, UnreadByte returns an error.
 //
 // Holds the WriteLock.
-func (b *SafeBuffer) UnreadByte() error {
+func (b *ConcurrentBuf) UnreadByte() error {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.b.UnreadByte()
@@ -315,7 +314,7 @@ func (b *SafeBuffer) UnreadByte() error {
 // delim.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) ReadBytes(delim byte) (line []byte, err error) {
+func (b *ConcurrentBuf) ReadBytes(delim byte) (line []byte, err error) {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.ReadBytes(delim)
@@ -329,7 +328,7 @@ func (b *SafeBuffer) ReadBytes(delim byte) (line []byte, err error) {
 // in delim.
 //
 // Holds the ReadLock.
-func (b *SafeBuffer) ReadString(delim byte) (line string, err error) {
+func (b *ConcurrentBuf) ReadString(delim byte) (line string, err error) {
 	b.m.RLock()
 	defer b.m.RUnlock()
 	return b.b.ReadString(delim)

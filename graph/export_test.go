@@ -49,8 +49,8 @@ func (g *Graph) ComputeXAxisBounds(s terminal.Size, following bool) []XAxisSpanB
 	header := g.data.LockFreeHeader()
 	iter := g.data.LockFreeIter(following)
 	x := computeXAxis(
-		bytes.NewSafeBuffer(),
-		bytes.NewSafeBuffer(),
+		bytes.NewConcurrentBuf(),
+		bytes.NewConcurrentBuf(),
 		s,
 		header.TimeSpan,
 		g.data.LockFreeSpanInfos(),

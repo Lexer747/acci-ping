@@ -8,6 +8,7 @@ package data
 
 import (
 	"fmt"
+	"iter"
 	"math"
 	"net"
 	"slices"
@@ -82,6 +83,31 @@ func (d *Data) GetFull(index int64) ping.PingResults {
 		IP:   ip,
 	}
 }
+
+// All yields every point in insertion order together with its index.
+func (d *Data) All() iter.Seq2[int64, ping.PingDataPoint] {
+	// this allocates nothing beyond the iterator itself
+	return func(yield func(int64, ping.PingDataPoint) bool) {
+		for i := range d.TotalCount {
+			if !yield(i, d.Get(i)) {
+				return
+			}
+		}
+	}
+}
+
+// AllFull is like [Data.All] but yields the full [ping.PingResults] (including the resolved IP) for each point.
+func (d *Data) AllFull() iter.Seq2[int64, ping.PingResults] {
+	// this allocates nothing beyond the iterator itself
+	return func(yield func(int64, ping.PingResults) bool) {
+		for i := range d.TotalCount {
+			if !yield(i, d.GetFull(i)) {
+				return
+			}
+		}
+	}
+}
+
 func (d *Data) End(index int64) bool {
 	return int(index) == len(d.InsertOrder)
 }
@@ -107,8 +133,7 @@ func (d *Data) Summary() string {
 
 func (d *Data) In(tz *time.Location) *Data {
 	ret := newVersionedData(d.URL, d.PingsMeta)
-	for i := range d.TotalCount {
-		p := d.GetFull(i)
+	for _, p := range d.AllFull() {
 		p.Data.Timestamp = p.Data.Timestamp.In(tz)
 		ret.AddPoint(p)
 	}
@@ -566,8 +591,7 @@ func (d *Data) migrate() {
 			// the next migration
 		case runsWithNoIndex:
 			d.Runs = &Runs{GoodPackets: &Run{}, DroppedPackets: &Run{}}
-			for i := range d.TotalCount {
-				p := d.Get(i)
+			for i, p := range d.All() {
 				d.Runs.AddPoint(i, p)
 			}
 		case currentDataVersion:

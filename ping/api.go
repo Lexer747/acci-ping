@@ -97,10 +97,9 @@ func (p *Ping) OneShot(url string) (time.Duration, error) {
 	begin := time.Now()
 
 	// Now wait for the result
+	p.timeout = time.Second
 	buffer := make([]byte, 255)
-	timeoutCtx, cancel := context.WithTimeoutCause(context.Background(), time.Second, pingTimeout{Duration: 100 * time.Millisecond})
-	defer cancel()
-	n, err := p.pingRead(timeoutCtx, buffer)
+	n, err := p.pingRead(context.Background(), begin.Add(p.timeout), buffer)
 	duration := time.Since(begin)
 	if err != nil {
 		return duration, errors.Wrapf(err, "couldn't read packet from %q", url)

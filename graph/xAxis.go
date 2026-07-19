@@ -77,13 +77,13 @@ func computeXAxis(
 	total int,
 ) drawingXAxis {
 	space := s.Width - 6
-	remaining := space
 	// First add the initial dot for A E S T H E T I C S
 	fmt.Fprint(toWriteTo, ansi.CursorPosition(s.Height, 1)+origin+padding+padding+padding+padding)
 
 	var xAxisSpans []*XAxisSpanInfo
 	if followLatestSpan {
 		singleSpans := spans[len(spans)-1:]
+		// startX/endX drive plotting (full terminal), width drives label layout (drawable area only).
 		xAxisSpans = []*XAxisSpanInfo{
 			{
 				spans:     singleSpans,
@@ -92,7 +92,7 @@ func computeXAxis(
 				timeSpan:  singleSpans[0].TimeSpan,
 				startX:    1,
 				endX:      s.Width,
-				width:     s.Width,
+				width:     space,
 			},
 		}
 		overall = singleSpans[0].TimeSpan
@@ -116,24 +116,23 @@ func computeXAxis(
 	//
 	// In each iteration, we must determine the time in which the span lives and how much terminal space it
 	// should take up. And then the actual values so that we actually plot against this axis accurately.
+	cursorX := s.Width - space
 	for _, span := range xAxisSpans {
-		span.startX = min(s.Width, s.Width-remaining)
+		span.startX = min(s.Width, cursorX)
+		cursorX += span.width
+		span.endX = min(s.Width, cursorX)
 
 		start, times := span.timeSpan.FormatDraw(span.width, 2)
 		if len(times) < 1 {
 			toCrop := max(min(span.width-2, len(start)-1), 0)
 			cropped := start[:toCrop]
-			remaining -= len(cropped) + 2
 			fmt.Fprintf(toWriteTo, "%s", themes.Emphasis(cropped))
-			toWriteTo.WriteString(padding + padding)
+			writePadding(toWriteTo, span.width-len(cropped), padding)
 		} else {
-			remaining -= len(start) + 4 + 2
 			fmt.Fprint(toWriteTo, themes.Primary("[ ")+themes.Emphasis(start)+themes.Primary(" ]"))
 			toWriteTo.WriteString(padding + padding)
-			remaining = xAxisDrawTimes(toWriteTo, times, remaining, padding)
+			xAxisDrawTimes(toWriteTo, times, span.width-(len(start)+6), padding)
 		}
-
-		span.endX = min(s.Width, s.Width-remaining)
 	}
 	// Finally we add these vertical bars to indicate that the axis is not continuous and a new graph is
 	// starting.
@@ -202,7 +201,6 @@ func combineSpansPixelWise(spans []*graphdata.SpanInfo, startingWidth, total int
 		}
 		acc += ratio
 	}
-	// TODO this width expanding finalizing still leaves some of the terminal unfilled, fix that.
 	totalWidth := sliceutils.Fold(retSpans, 0, func(x *XAxisSpanInfo, acc int) int { return x.width + acc })
 	delta := startingWidth - totalWidth
 	toAdd := delta / len(retSpans)
@@ -215,25 +213,45 @@ func combineSpansPixelWise(spans []*graphdata.SpanInfo, startingWidth, total int
 	return retSpans
 }
 
-func xAxisDrawTimes(b *bytes.SafeBuffer, times []string, remaining int, padding string) int {
+func xAxisDrawTimes(b *bytes.SafeBuffer, times []string, budget int, padding string) {
+	// Drop trailing labels that don't fit: overflowing [budget] would misalign every span to our right (#18).
+	labelCols := 0
+	kept := 0
 	for _, point := range times {
-		if remaining <= len(point) {
+		if labelCols+len(point) > budget {
 			break
 		}
-		b.WriteString(themes.Highlight(point))
-		remaining -= len(point)
-		if remaining <= 1 {
-			break
-		}
-		b.WriteString(padding)
-		remaining--
-		if remaining <= 1 {
-			break
-		}
-		b.WriteString(padding)
-		remaining--
+		labelCols += len(point)
+		kept++
 	}
-	return remaining
+	times = times[:kept]
+	if len(times) == 0 {
+		writePadding(b, max(budget, 0), padding)
+		return
+	}
+	gaps := budget - labelCols
+	per := gaps / len(times)
+	extra := gaps % len(times)
+	written := 0
+	for i, point := range times {
+		b.WriteString(themes.Highlight(point))
+		written += len(point)
+		g := per
+		if i < extra {
+			g++
+		}
+		writePadding(b, g, padding)
+		written += g
+	}
+	if written < budget {
+		writePadding(b, budget-written, padding)
+	}
+}
+
+func writePadding(b *bytes.SafeBuffer, n int, padding string) {
+	for range n {
+		b.WriteString(padding)
+	}
 }
 
 func getX(t time.Time, span *XAxisSpanInfo, y drawingYAxis, s terminal.Size) int {

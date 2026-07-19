@@ -145,19 +145,21 @@ func (ft FileTest) Run(t *testing.T) {
 	if !ft.OnlyDoLinear {
 		yAxis = append(yAxis, graph.Logarithmic)
 	}
-	for _, y := range yAxis {
-		for _, size := range ft.Sizes {
-			actualStrings := produceFrame(t, size, d, y, ft.TerminalWrapping)
+	for _, following := range []bool{false, true} {
+		for _, y := range yAxis {
+			for _, size := range ft.Sizes {
+				actualStrings := produceFrame(t, size, d, y, following, ft.TerminalWrapping)
 
-			// ft.update(t, y, size, actualStrings)
-			ft.assertEqual(t, y, size, actualStrings)
+				// ft.update(t, y, size, following, actualStrings)
+				ft.assertEqual(t, y, size, following, actualStrings)
+			}
 		}
 	}
 }
 
-func (ft FileTest) assertEqual(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, actualStrings []string) {
+func (ft FileTest) assertEqual(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, following bool, actualStrings []string) {
 	t.Helper()
-	outputFile := ft.getOutputFileName(yAxis, size)
+	outputFile := ft.getOutputFileName(yAxis, size, following)
 	expectedBytes, err := os.ReadFile(outputFile)
 	assert.NilError(t, err)
 	actualJoined := strings.Join(actualStrings, "\n")
@@ -180,17 +182,23 @@ func (ft FileTest) assertEqual(t *testing.T, yAxis graph.YAxisScale, size termin
 func (ft FileTest) getInputFileName() string {
 	return fmt.Sprintf("%s/%s.pings", inputPath, ft.FileName)
 }
-func (ft FileTest) getOutputFileName(yAxis graph.YAxisScale, size terminal.Size) string {
-	if ft.OnlyDoLinear {
-		return fmt.Sprintf("%s/%s/w%d-h%d.frame", outputPath, ft.FileName, size.Width, size.Height)
+func (ft FileTest) getOutputFileName(yAxis graph.YAxisScale, size terminal.Size, following bool) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s/%s/", outputPath, ft.FileName)
+	if following {
+		b.WriteString("following/")
 	}
-	return fmt.Sprintf("%s/%s/%s-w%d-h%d.frame", outputPath, ft.FileName, yAxis, size.Width, size.Height)
+	if !ft.OnlyDoLinear {
+		fmt.Fprintf(&b, "%s-", yAxis)
+	}
+	fmt.Fprintf(&b, "w%d-h%d.frame", size.Width, size.Height)
+	return b.String()
 }
 
 //nolint:unused
-func (ft FileTest) update(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, actualStrings []string) {
+func (ft FileTest) update(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, following bool, actualStrings []string) {
 	t.Helper()
-	outputFile := ft.getOutputFileName(yAxis, size)
+	outputFile := ft.getOutputFileName(yAxis, size, following)
 	err := os.MkdirAll(path.Dir(outputFile), 0o777)
 	assert.NilError(t, err)
 	err = os.WriteFile(outputFile, []byte(strings.Join(actualStrings, "\n")), 0o777)
@@ -204,8 +212,16 @@ func produceFrame(
 	size terminal.Size,
 	data *data.Data,
 	yAxis graph.YAxisScale,
+	following bool,
 	terminalWrapping th.TerminalWrapping,
 ) []string {
+	t.Helper()
+	g := newTestGraph(t, size, data, yAxis, following)
+	output := th.MakeBuffer(size)
+	return th.EmulateTerminal(g.ComputeFrame(), output, size, terminalWrapping)
+}
+
+func newTestGraph(t *testing.T, size terminal.Size, d *data.Data, yAxis graph.YAxisScale, following bool) *graph.Graph {
 	t.Helper()
 	stdin, _, term, setTerm, err := th.NewTestTerminal()
 	setTerm(size)
@@ -220,12 +236,37 @@ func produceFrame(
 		Terminal:      term,
 		DrawingBuffer: draw.NewPaintBuffer(),
 		DebugStrict:   true,
-		Data:          data,
-		Presentation:  graph.Presentation{YAxisScale: yAxis},
+		Data:          d,
+		Presentation:  graph.Presentation{YAxisScale: yAxis, Following: following},
 	})
-	defer func() { stdin.WriteCtrlC(t) }()
-	output := th.MakeBuffer(size)
-	return th.EmulateTerminal(g.ComputeFrame(), output, size, terminalWrapping)
+	t.Cleanup(func() { stdin.WriteCtrlC(t) })
+	return g
+}
+
+// TestXAxisFillsDrawableArea pins the invariant behind #18: the computed x-axis spans must be contiguous and
+// together fill the whole drawable area (last endX == terminal width), across a range of widths.
+func TestXAxisFillsDrawableArea(t *testing.T) {
+	t.Parallel()
+	// long-gap has multiple recording sessions, so the axis is split into several spans.
+	d := graphTh.GetFromFile(t, inputPath+"/long-gap.pings")
+	widths := []int{80, 120, 200, 300, 400, 500}
+	for _, following := range []bool{false, true} {
+		for _, w := range widths {
+			size := terminal.Size{Height: 40, Width: w}
+			g := newTestGraph(t, size, d, graph.Linear, following)
+			bounds := g.ComputeXAxisBounds(size, following)
+			assert.Assert(t, len(bounds) > 0)
+			if !following {
+				assert.Equal(t, bounds[0].StartX, 6, "first span starts after the y-axis labels (w=%d)", w)
+			}
+			last := bounds[len(bounds)-1]
+			assert.Equal(t, last.EndX, size.Width, "last span fills to the terminal width (w=%d following=%t)", w, following)
+			for i := 1; i < len(bounds); i++ {
+				assert.Equal(t, bounds[i-1].EndX, bounds[i].StartX,
+					"spans are contiguous at index %d (w=%d following=%t)", i, w, following)
+			}
+		}
+	}
 }
 
 func TestEqualDurations(t *testing.T) {
@@ -243,6 +284,6 @@ func TestEqualDurations(t *testing.T) {
 	}
 	// test is simply not to panic:
 	size := terminal.Size{Height: 32, Width: 216}
-	_ = produceFrame(t, size, d, graph.Linear, th.TerminalWrapping(0))
-	_ = produceFrame(t, size, d, graph.Logarithmic, th.TerminalWrapping(0))
+	_ = produceFrame(t, size, d, graph.Linear, false, th.TerminalWrapping(0))
+	_ = produceFrame(t, size, d, graph.Logarithmic, false, th.TerminalWrapping(0))
 }

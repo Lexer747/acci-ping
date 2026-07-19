@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -240,10 +240,10 @@ func getX(t time.Time, span *XAxisSpanInfo, y drawingYAxis, s terminal.Size) int
 	newMin := min(max(1, s.Width-1), span.endX)
 	newMax := max(y.labelSize, span.startX)
 	timestamp := span.timeSpan.End.Sub(t)
-	if span.pingStats.GoodCount+span.spanStats.PacketsDropped <= 1 {
-		// Edge case, when we have exactly one datum but the overall graph has more than one datum so we
-		// didn't short-circuit and need to draw this one point in an arbitrary point between the spans start
-		// and end.
+	if span.pingStats.GoodCount+span.spanStats.PacketsDropped <= 1 || span.timeSpan.Duration == 0 {
+		// Edge case, when we have exactly one datum (or multiple points sharing an identical timestamp, so
+		// the span duration is zero) but the overall graph has more than one datum so we didn't short-circuit
+		// and need to draw this point in an arbitrary point between the spans start and end.
 		return int(numeric.NormalizeToRange(0.5, 0, 1, float64(newMin), float64(newMax)))
 	}
 	// These are inverted deliberately since the drawing reference is symmetric in the x

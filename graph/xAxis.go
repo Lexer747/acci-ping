@@ -83,6 +83,7 @@ func computeXAxis(
 	var xAxisSpans []*XAxisSpanInfo
 	if followLatestSpan {
 		singleSpans := spans[len(spans)-1:]
+		// startX/endX drive plotting (full terminal), width drives label layout (drawable area only).
 		xAxisSpans = []*XAxisSpanInfo{
 			{
 				spans:     singleSpans,
@@ -200,7 +201,6 @@ func combineSpansPixelWise(spans []*graphdata.SpanInfo, startingWidth, total int
 		}
 		acc += ratio
 	}
-	// TODO this width expanding finalizing still leaves some of the terminal unfilled, fix that.
 	totalWidth := sliceutils.Fold(retSpans, 0, func(x *XAxisSpanInfo, acc int) int { return x.width + acc })
 	delta := startingWidth - totalWidth
 	toAdd := delta / len(retSpans)
@@ -214,11 +214,22 @@ func combineSpansPixelWise(spans []*graphdata.SpanInfo, startingWidth, total int
 }
 
 func xAxisDrawTimes(b *bytes.SafeBuffer, times []string, budget int, padding string) {
+	// Drop trailing labels that don't fit: overflowing [budget] would misalign every span to our right (#18).
 	labelCols := 0
+	kept := 0
 	for _, point := range times {
+		if labelCols+len(point) > budget {
+			break
+		}
 		labelCols += len(point)
+		kept++
 	}
-	gaps := max(budget-labelCols, 0)
+	times = times[:kept]
+	if len(times) == 0 {
+		writePadding(b, max(budget, 0), padding)
+		return
+	}
+	gaps := budget - labelCols
 	per := gaps / len(times)
 	extra := gaps % len(times)
 	written := 0

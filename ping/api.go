@@ -68,10 +68,10 @@ func (p *Ping) OneShot(url string) (time.Duration, error) {
 
 	// Create a listener for the IP we will use
 	closer, err := p.startListening(url)
-	defer closer()
 	if err != nil {
 		return 0, err
 	}
+	defer closer()
 
 	dnsTimeout, cancel := context.WithTimeoutCause(context.Background(), time.Second, pingTimeout{Duration: 100 * time.Millisecond})
 	defer cancel()

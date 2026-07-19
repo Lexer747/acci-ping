@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -47,7 +47,7 @@ func NewNotification[T any](initial terminal.Size, Drawable func(terminal.Size, 
 // automatically removed and a re-render performed.
 //
 // g is the GUI in which the paint update should be sent too.
-func (n *Notification[T]) NewValue(g GUI, toShow T, buffer *bytes.SafeBuffer, timeout time.Duration) {
+func (n *Notification[T]) NewValue(g GUI, toShow T, buffer *bytes.ConcurrentBuf, timeout time.Duration) {
 	n.m.Lock()
 	// First generate a unique id for this value and add it to our map.
 	key := n.insert(toShow)
@@ -69,7 +69,7 @@ func (n *Notification[T]) NewValue(g GUI, toShow T, buffer *bytes.SafeBuffer, ti
 // this size and cause all currently stored items to be re-drawn.
 //
 // g is the GUI in which the paint update should be sent too.
-func (n *Notification[T]) NewSize(g GUI, size terminal.Size, buffer *bytes.SafeBuffer) {
+func (n *Notification[T]) NewSize(g GUI, size terminal.Size, buffer *bytes.ConcurrentBuf) {
 	n.m.Lock()
 	defer n.m.Unlock()
 	n.lastSize = size
@@ -95,7 +95,7 @@ func (n *Notification[T]) insert(toShow T) int {
 }
 
 // locklessRender writes the drawable to the buffer [b].
-func (n *Notification[T]) locklessRender(size terminal.Size, b *bytes.SafeBuffer) PaintUpdate {
+func (n *Notification[T]) locklessRender(size terminal.Size, b *bytes.ConcurrentBuf) PaintUpdate {
 	ret := None
 	hasData := b.Len() != 0
 	b.Reset()

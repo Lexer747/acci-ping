@@ -52,7 +52,7 @@ func yAxisStartup() {
 
 var spanBar string
 
-func addYAxisVerticalSpanIndicator(bars *bytes.SafeBuffer, s terminal.Size, spans []*XAxisSpanInfo) {
+func addYAxisVerticalSpanIndicator(bars *bytes.ConcurrentBuf, s terminal.Size, spans []*XAxisSpanInfo) {
 	spanSeparator := makeBar(spanBar, s, true)
 	// Don't draw the last span since this is implied by the end of the terminal
 	for _, span := range spans[:len(spans)-1] {
@@ -67,7 +67,7 @@ func addYAxisVerticalSpanIndicator(bars *bytes.SafeBuffer, s terminal.Size, span
 }
 
 func computeYAxis(
-	toWriteTo *bytes.SafeBuffer,
+	toWriteTo *bytes.ConcurrentBuf,
 	size terminal.Size,
 	stats *data.Stats,
 	url string,

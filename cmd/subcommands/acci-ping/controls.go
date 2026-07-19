@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -48,7 +48,7 @@ type controlState struct {
 	graph.Presentation
 }
 
-func (c controlState) render(size terminal.Size, buf *bytes.SafeBuffer) gui.PaintUpdate {
+func (c controlState) render(size terminal.Size, buf *bytes.ConcurrentBuf) gui.PaintUpdate {
 	ret := gui.None
 	buf.Reset()
 	if !c.Following || c.YAxisScale != graph.Logarithmic {

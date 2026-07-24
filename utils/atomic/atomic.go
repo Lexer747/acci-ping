@@ -15,7 +15,7 @@ import "sync"
 // cumbersome) to ensure thread safe of a given value or struct which normally would not be safe. There are
 // obviously ways to misuse this such as taking pointers, of the returned values.
 //
-// Do not put points or arrays into [T] these will break the concurrent invariants.
+// Do not put pointers or arrays into [T] these will break the concurrent invariants.
 type Of[T any] struct {
 	m       *sync.RWMutex
 	storage T

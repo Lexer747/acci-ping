@@ -46,13 +46,18 @@ type FileTest struct {
 	OnlyDoLinear     bool
 }
 
-var StandardTestSizes = []terminal.Size{
+var fullscreen = terminal.Size{Height: 74, Width: 354}
+var standardTestSizes = []terminal.Size{
 	{Height: 40, Width: 80}, // Viewing height
 	{Height: 25, Width: 80},
 	{Height: 16, Width: 284}, // My small vscode window
 	{Height: 30, Width: 300}, // My average vscode window
 	{Height: 45, Width: 120}, // Tall vertical screen
-	{Height: 74, Width: 354}, // Fullscreen
+	fullscreen,               // Fullscreen
+}
+
+var onlyFullScreen = []terminal.Size{
+	fullscreen,
 }
 
 var winter = time.FixedZone("+0", 0)
@@ -62,58 +67,63 @@ func TestFiles(t *testing.T) {
 	t.Parallel()
 	t.Run("Small", FileTest{
 		FileName:       "small-2-02-08-2024",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: summer,
 	}.Run)
 	t.Run("Medium", FileTest{
 		FileName:       "medium-395-02-08-2024",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: summer,
 	}.Run)
 	t.Run("Medium with Drops", FileTest{
 		FileName:       "medium-309-with-induced-drops-02-08-2024",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: summer,
 	}.Run)
 	t.Run("Medium with minute Gaps", FileTest{
 		FileName:       "medium-minute-gaps",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: summer,
 	}.Run)
 	t.Run("Medium with hour Gaps", FileTest{
 		FileName:       "medium-hour-gaps",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: summer,
 	}.Run)
 	t.Run("Hotel", FileTest{
 		FileName:       "medium-hotel",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: summer,
 	}.Run)
 	t.Run("Large Hotel", FileTest{
 		FileName:       "large-hotel",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: summer,
 	}.Run)
 	t.Run("Gap", FileTest{
 		FileName:       "long-gap",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: summer,
 	}.Run)
 	t.Run("Smoke Test", FileTest{
 		FileName:       "smoke",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: winter,
 	}.Run)
 	t.Run("Span bugs", FileTest{
 		FileName:       "huge-over-days",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: winter,
 	}.Run)
 	t.Run("verybad", FileTest{
 		FileName:       "verybad-london",
-		Sizes:          StandardTestSizes,
+		Sizes:          standardTestSizes,
 		TimeZoneOfFile: winter,
+	}.Run)
+	t.Run("100k", FileTest{
+		FileName:       "100k",
+		Sizes:          onlyFullScreen,
+		TimeZoneOfFile: summer,
 	}.Run)
 }
 

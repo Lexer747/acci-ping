@@ -214,16 +214,8 @@ func combineSpansPixelWise(spans []*graphdata.SpanInfo, startingWidth, total int
 }
 
 func xAxisDrawTimes(b *bytes.SafeBuffer, times []string, budget int, padding string) {
+	labelCols, kept := computeKeep(times, budget)
 	// Drop trailing labels that don't fit: overflowing [budget] would misalign every span to our right (#18).
-	labelCols := 0
-	kept := 0
-	for _, point := range times {
-		if labelCols+len(point) > budget {
-			break
-		}
-		labelCols += len(point)
-		kept++
-	}
 	times = times[:kept]
 	if len(times) == 0 {
 		writePadding(b, max(budget, 0), padding)
@@ -233,19 +225,35 @@ func xAxisDrawTimes(b *bytes.SafeBuffer, times []string, budget int, padding str
 	per := gaps / len(times)
 	extra := gaps % len(times)
 	written := 0
+	var g int
 	for i, point := range times {
 		b.WriteString(themes.Highlight(point))
 		written += len(point)
-		g := per
+		// set the padding to be per gap adding extra space to fill the int division
+		g = per
 		if i < extra {
 			g++
 		}
 		writePadding(b, g, padding)
 		written += g
 	}
+	// ensure that we always fill all the space, extra padding the last label
 	if written < budget {
 		writePadding(b, budget-written, padding)
 	}
+}
+
+// computeKeep determines how many entries of the [times] slice can fit into [budget]. Returning the length of
+// label and the indices which fit.
+func computeKeep(times []string, budget int) (stringSizes int, kept int) {
+	for _, point := range times {
+		if stringSizes+len(point) > budget {
+			break
+		}
+		stringSizes += len(point)
+		kept++
+	}
+	return stringSizes, kept
 }
 
 func writePadding(b *bytes.SafeBuffer, n int, padding string) {

@@ -14,6 +14,8 @@ import "sync"
 // concurrent way with a mutex, it merely provides a convenient way (when critical sections are too
 // cumbersome) to ensure thread safe of a given value or struct which normally would not be safe. There are
 // obviously ways to misuse this such as taking pointers, of the returned values.
+//
+// Do not put points or arrays into [T] these will break the concurrent invariants.
 type Of[T any] struct {
 	m       *sync.RWMutex
 	storage T
@@ -27,7 +29,8 @@ func Init[T any](t T) Of[T] {
 	return Of[T]{m: &sync.RWMutex{}, storage: t}
 }
 
-// Get accesses the storage and returns it locking it from other writers.
+// Get accesses the storage and returns a shallow copy it locking it from other writers. This copy is safe to
+// hold to onto indefinitely and cannot be modified by other go routines.
 func (a *Of[T]) Get() T {
 	a.m.RLock()
 	defer a.m.RUnlock()

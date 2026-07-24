@@ -3,7 +3,7 @@ module github.com/Lexer747/acci-ping
 go 1.26.0
 
 require (
-	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
+	golang.org/x/exp v0.0.0-20260718201538-764159d718ef
 	golang.org/x/net v0.57.0
 	golang.org/x/term v0.45.0
 )

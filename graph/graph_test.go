@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -16,6 +16,8 @@ import (
 
 	"github.com/Lexer747/acci-ping/draw"
 	"github.com/Lexer747/acci-ping/graph"
+	"github.com/Lexer747/acci-ping/graph/data"
+	graphTh "github.com/Lexer747/acci-ping/graph/th"
 	"github.com/Lexer747/acci-ping/ping"
 	"github.com/Lexer747/acci-ping/terminal"
 	"github.com/Lexer747/acci-ping/utils/env"
@@ -192,6 +194,51 @@ type DrawingTest struct {
 	ExpectedFile string
 	Values       []ping.PingDataPoint
 	Size         terminal.Size
+}
+
+// TestXAxisFillsDrawableArea pins the invariant behind #18: the computed x-axis spans must be contiguous and
+// together fill the whole drawable area (last endX == terminal width), across a range of widths.
+func TestXAxisFillsDrawableArea(t *testing.T) {
+	t.Parallel()
+	// long-gap has multiple recording sessions, so the axis is split into several spans.
+	d := graphTh.GetFromFile(t, inputPath+"/long-gap.pings")
+	widths := []int{80, 120, 200, 300, 400, 500}
+	for _, following := range []bool{false, true} {
+		for _, w := range widths {
+			size := terminal.Size{Height: 40, Width: w}
+			g := newTestGraph(t, size, d, graph.Linear, following)
+			bounds := g.ComputeXAxisBounds(size, following)
+			assert.Assert(t, len(bounds) > 0)
+			if !following {
+				assert.Equal(t, bounds[0].StartX, 6, "first span starts after the y-axis labels (w=%d)", w)
+			}
+			last := bounds[len(bounds)-1]
+			assert.Equal(t, last.EndX, size.Width, "last span fills to the terminal width (w=%d following=%t)", w, following)
+			for i := 1; i < len(bounds); i++ {
+				assert.Equal(t, bounds[i-1].EndX, bounds[i].StartX,
+					"spans are contiguous at index %d (w=%d following=%t)", i, w, following)
+			}
+		}
+	}
+}
+
+func TestEqualDurations(t *testing.T) {
+	t.Parallel()
+	d := data.NewData("example.com")
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Several good packets, all identical duration -> stats.Min == stats.Max
+	for i := range 20 {
+		d.AddPoint(ping.PingResults{
+			Data: ping.PingDataPoint{
+				Duration:  13 * time.Millisecond,
+				Timestamp: base.Add(time.Duration(i) * time.Second),
+			},
+		})
+	}
+	// test is simply not to panic:
+	size := terminal.Size{Height: 32, Width: 216}
+	_ = produceFrame(t, size, d, graph.Linear, false, th.TerminalWrapping(0))
+	_ = produceFrame(t, size, d, graph.Logarithmic, false, th.TerminalWrapping(0))
 }
 
 //nolint:unused

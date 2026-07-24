@@ -155,19 +155,21 @@ func (ft FileTest) Run(t *testing.T) {
 	if !ft.OnlyDoLinear {
 		yAxis = append(yAxis, graph.Logarithmic)
 	}
-	for _, y := range yAxis {
-		for _, size := range ft.Sizes {
-			actualStrings := produceFrame(t, size, d, y, ft.TerminalWrapping)
+	for _, following := range []bool{false, true} {
+		for _, y := range yAxis {
+			for _, size := range ft.Sizes {
+				actualStrings := produceFrame(t, size, d, y, following, ft.TerminalWrapping)
 
-			// ft.update(t, y, size, actualStrings)
-			ft.assertEqual(t, y, size, actualStrings)
+				// ft.update(t, y, size, following, actualStrings)
+				ft.assertEqual(t, y, size, following, actualStrings)
+			}
 		}
 	}
 }
 
-func (ft FileTest) assertEqual(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, actualStrings []string) {
+func (ft FileTest) assertEqual(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, following bool, actualStrings []string) {
 	t.Helper()
-	outputFile := ft.getOutputFileName(yAxis, size)
+	outputFile := ft.getOutputFileName(yAxis, size, following)
 	expectedBytes, err := os.ReadFile(outputFile)
 	assert.NilError(t, err)
 	actualJoined := strings.Join(actualStrings, "\n")
@@ -190,17 +192,23 @@ func (ft FileTest) assertEqual(t *testing.T, yAxis graph.YAxisScale, size termin
 func (ft FileTest) getInputFileName() string {
 	return fmt.Sprintf("%s/%s.pings", inputPath, ft.FileName)
 }
-func (ft FileTest) getOutputFileName(yAxis graph.YAxisScale, size terminal.Size) string {
-	if ft.OnlyDoLinear {
-		return fmt.Sprintf("%s/%s/w%d-h%d.frame", outputPath, ft.FileName, size.Width, size.Height)
+func (ft FileTest) getOutputFileName(yAxis graph.YAxisScale, size terminal.Size, following bool) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s/%s/", outputPath, ft.FileName)
+	if following {
+		b.WriteString("following/")
 	}
-	return fmt.Sprintf("%s/%s/%s-w%d-h%d.frame", outputPath, ft.FileName, yAxis, size.Width, size.Height)
+	if !ft.OnlyDoLinear {
+		fmt.Fprintf(&b, "%s-", yAxis)
+	}
+	fmt.Fprintf(&b, "w%d-h%d.frame", size.Width, size.Height)
+	return b.String()
 }
 
 //nolint:unused
-func (ft FileTest) update(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, actualStrings []string) {
+func (ft FileTest) update(t *testing.T, yAxis graph.YAxisScale, size terminal.Size, following bool, actualStrings []string) {
 	t.Helper()
-	outputFile := ft.getOutputFileName(yAxis, size)
+	outputFile := ft.getOutputFileName(yAxis, size, following)
 	err := os.MkdirAll(path.Dir(outputFile), 0o777)
 	assert.NilError(t, err)
 	err = os.WriteFile(outputFile, []byte(strings.Join(actualStrings, "\n")), 0o777)
@@ -214,8 +222,16 @@ func produceFrame(
 	size terminal.Size,
 	data *data.Data,
 	yAxis graph.YAxisScale,
+	following bool,
 	terminalWrapping th.TerminalWrapping,
 ) []string {
+	t.Helper()
+	g := newTestGraph(t, size, data, yAxis, following)
+	output := th.MakeBuffer(size)
+	return th.EmulateTerminal(g.ComputeFrame(), output, size, terminalWrapping)
+}
+
+func newTestGraph(t *testing.T, size terminal.Size, d *data.Data, yAxis graph.YAxisScale, following bool) *graph.Graph {
 	t.Helper()
 	stdin, _, term, setTerm, err := th.NewTestTerminal()
 	setTerm(size)
@@ -230,29 +246,9 @@ func produceFrame(
 		Terminal:      term,
 		DrawingBuffer: draw.NewPaintBuffer(),
 		DebugStrict:   true,
-		Data:          data,
-		Presentation:  graph.Presentation{YAxisScale: yAxis},
+		Data:          d,
+		Presentation:  graph.Presentation{YAxisScale: yAxis, Following: following},
 	})
-	defer func() { stdin.WriteCtrlC(t) }()
-	output := th.MakeBuffer(size)
-	return th.EmulateTerminal(g.ComputeFrame(), output, size, terminalWrapping)
-}
-
-func TestEqualDurations(t *testing.T) {
-	t.Parallel()
-	d := data.NewData("example.com")
-	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	// Several good packets, all identical duration -> stats.Min == stats.Max
-	for i := range 20 {
-		d.AddPoint(ping.PingResults{
-			Data: ping.PingDataPoint{
-				Duration:  13 * time.Millisecond,
-				Timestamp: base.Add(time.Duration(i) * time.Second),
-			},
-		})
-	}
-	// test is simply not to panic:
-	size := terminal.Size{Height: 32, Width: 216}
-	_ = produceFrame(t, size, d, graph.Linear, th.TerminalWrapping(0))
-	_ = produceFrame(t, size, d, graph.Logarithmic, th.TerminalWrapping(0))
+	t.Cleanup(func() { stdin.WriteCtrlC(t) })
+	return g
 }

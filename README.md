@@ -93,7 +93,7 @@ go!
 
 Or use:
 ```sh
-go install github.com/Lexer747/acci-ping@v1.0.3
+go install github.com/Lexer747/acci-ping@v1.0.4
 ```
 To build and install locally via the `go install` toolchain
 

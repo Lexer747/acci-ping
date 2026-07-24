@@ -328,7 +328,6 @@ func duplicateData(f *os.File) (*data.Data, error) {
 
 // TODO incremental read/writes, get the URL ASAP then start the channel, then incremental continuation.
 func loadFile(file, url string) (*data.Data, *os.File) {
-	// TODO this currently panics if the url's don't match we should do better
 	d, f, err := files.LoadOrCreateFile(file, url)
 	exit.OnError(err)
 	return d, f

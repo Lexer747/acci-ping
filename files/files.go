@@ -49,6 +49,8 @@ func MakeNewEmptyFile(path string, url string) (*data.Data, *os.File, error) {
 	return d, newFile, d.AsCompact(newFile)
 }
 
+var URLMismatch = errors.New("URL mismatch")
+
 // LoadOrCreateFile will read a '.pings' file returning the data and the file handle (opened in read/write),
 // or any error if a disk issue occurs or the data format was un-parsable. If the file isn't found at the
 // given path then this specific error is swallowed and a new file is created with empty data pointing the
@@ -64,8 +66,13 @@ func LoadOrCreateFile(path string, url string) (*data.Data, *os.File, error) {
 		if err != nil {
 			return nil, nil, err
 		}
+	case err != nil:
+		return nil, nil, err
 	}
-	check.Check(d != nil && f != nil && d.URL == url, "data should be initialised")
+	if d.URL != url {
+		return d, f, errors.Wrapf(URLMismatch, "%s contains URL %q but wanted %q", path, d.URL, url)
+	}
+	check.Check(d != nil && f != nil, "data should be initialised")
 	// Once the data is written/read reset the handle back to the start
 	_, seekErr := f.Seek(0, 0)
 	return d, f, errors.Join(seekErr, err)

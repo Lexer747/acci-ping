@@ -10,6 +10,7 @@ linters:
     - embeddedstructfieldcheck # we use [fieldalignment] instead
     - errname
     - exhaustruct
+    - exhaustruct_v5 # To be re-enabled once fixed https://github.com/GaijinEntertainment/go-exhaustruct/issues/168
     - forbidigo
     - funlen
     - gochecknoglobals
@@ -17,6 +18,7 @@ linters:
     - gocritic
     - godot
     - godox
+    - gomodguard # 'gomodguard' is deprecated
     - ireturn
     - mnd
     - nlreturn

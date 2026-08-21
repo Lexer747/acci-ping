@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -50,7 +50,8 @@ func Fold[IN, OUT any, S ~[]IN](slice S, base OUT, f func(IN, OUT) OUT) OUT {
 }
 
 // Shuffle uses [rand.Shuffle] to shuffle all the elements of the [slice] and return a shuffled [clone] of the
-// input.
+// input. This is not a secure shuffle as it uses a weak number generator do not call for security sensitive
+// code.
 func Shuffle[S ~[]T, T any](slice S) S {
 	ret := slices.Clone(slice)
 	shuf := func(i, j int) {
@@ -58,6 +59,7 @@ func Shuffle[S ~[]T, T any](slice S) S {
 		ret[i] = ret[j]
 		ret[j] = t
 	}
+	//nolint:gosec // G404 this is not a security safe function and is declared as such above
 	rand.Shuffle(len(ret), shuf)
 	return ret
 }

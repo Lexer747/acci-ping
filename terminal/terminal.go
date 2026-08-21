@@ -270,10 +270,8 @@ func (t *Terminal) StartRaw(
 
 	controlCListener := ConditionalListener{
 		Applicable: func(r rune) bool { return r == '\x03' },
-		Listener: Listener{
-			Name:   "ctrl+c",
-			Action: ctrlCAction,
-		},
+		Name:       "ctrl+c",
+		Action:     ctrlCAction,
 	}
 	t.listeners = slices.Concat(t.listeners, []ConditionalListener{controlCListener}, listeners)
 	if fallbacks != nil {

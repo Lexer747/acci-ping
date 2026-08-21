@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -48,11 +48,9 @@ func main() {
 		Applicable: func(r rune) bool {
 			return r == 'l'
 		},
-		Listener: terminal.Listener{
-			Name: "clear",
-			Action: func(rune) error {
-				return t.ClearScreen(terminal.UpdateSize)
-			},
+		Name: "clear",
+		Action: func(rune) error {
+			return t.ClearScreen(terminal.UpdateSize)
 		},
 	}
 	// Actually start the terminal program. Note that the listeners are applied in order, so if more than one

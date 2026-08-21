@@ -296,10 +296,8 @@ func (app *Application) addListener(r rune, Action func(rune) error) {
 		panic(fmt.Sprintf("Adding more than one listener for '%v'", r))
 	}
 	app.listeningChars[r] = terminal.ConditionalListener{
-		Listener: terminal.Listener{
-			Action: Action,
-			Name:   "GUI Listener " + strconv.QuoteRune(r),
-		},
+		Action: Action,
+		Name:   "GUI Listener " + strconv.QuoteRune(r),
 		Applicable: func(in rune) bool {
 			return in == r
 		},

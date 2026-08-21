@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -61,13 +61,11 @@ func TestTerminalListener(t *testing.T) {
 			lastRune = r
 			return true
 		},
-		Listener: terminal.Listener{
-			Action: func(r rune) error {
-				assert.Equal(t, lastRune, r)
-				err := term.Print(string(r))
-				assert.NilError(t, err)
-				return nil
-			},
+		Action: func(r rune) error {
+			assert.Equal(t, lastRune, r)
+			err := term.Print(string(r))
+			assert.NilError(t, err)
+			return nil
 		},
 	}
 	_, err = term.StartRaw(ctx, cancelFunc, []terminal.ConditionalListener{testListener}, nil)
@@ -105,12 +103,10 @@ func TestTerminalFallbackListener(t *testing.T) {
 		Applicable: func(r rune) bool {
 			return r == 'a'
 		},
-		Listener: terminal.Listener{
-			Action: func(r rune) error {
-				<-m1
-				m2 <- struct{}{}
-				return nil
-			},
+		Action: func(r rune) error {
+			<-m1
+			m2 <- struct{}{}
+			return nil
 		},
 	}
 	fallback := terminal.Listener{

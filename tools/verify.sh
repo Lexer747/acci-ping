@@ -8,7 +8,7 @@
 
 go mod tidy
 goimports -w .
-golangci-lint run
+golangci-lint run --max-same-issues 0 --max-issues-per-linter 0
 
 ROOT=$(git rev-parse --show-toplevel)
 

@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -166,14 +166,16 @@ func (test BasicTimeSpanTest) Run(t *testing.T) {
 	for _, point := range test.Points {
 		gd.AddPoint(ping.PingResults{Data: point})
 	}
-	assert.Assert(t, is.Len(gd.LockFreeSpanInfos(), test.ExpectedSpanCount))
+	lf := gd.Lock()
+	defer gd.Unlock(lf)
+	assert.Assert(t, is.Len(gd.LockFreeSpanInfos(lf), test.ExpectedSpanCount))
 
-	assertEveryPointHasSpan(t, gd, gd.LockFreeSpanInfos())
+	assertEveryPointHasSpan(t, gd, lf, gd.LockFreeSpanInfos(lf))
 }
 
-func assertEveryPointHasSpan(t *testing.T, gd *graphdata.GraphData, actual []*graphdata.SpanInfo) {
+func assertEveryPointHasSpan(t *testing.T, gd *graphdata.GraphData, lf graphdata.LockFree, actual []*graphdata.SpanInfo) {
 	t.Helper()
-	iter := gd.LockFreeIter(false)
+	iter := gd.LockFreeIter(lf, false)
 	for i := range iter.Total {
 		p := iter.Get(i)
 		timestamp := p.Timestamp
@@ -207,16 +209,20 @@ func (test TimeSpanTest) Run(t *testing.T) {
 			gd.AddPoint(ping.PingResults{Data: point})
 			index++
 		}
-		actual := gd.LockFreeSpanInfos()
+		lf := gd.Lock()
+		actual := gd.LockFreeSpanInfos(lf)
+		gd.Unlock(lf)
 		assert.Check(t, is.DeepEqual(graphdata.Spans(expectedSpans), actual, utils_th.AllowAllUnexported), "index %d | %+v", i, span)
 	}
 
-	actual := gd.LockFreeSpanInfos()
+	lf := gd.Lock()
+	defer gd.Unlock(lf)
+	actual := gd.LockFreeSpanInfos(lf)
 	assert.Assert(t, is.Len(actual, len(expectedSpans)))
 	for i := range actual {
 		assert.Check(t, is.DeepEqual(expectedSpans[i], actual[i], utils_th.AllowAllUnexported), "index %d", i)
 	}
-	assertEveryPointHasSpan(t, gd, actual)
+	assertEveryPointHasSpan(t, gd, lf, actual)
 }
 
 type TimeSpanFileTest struct {
@@ -230,7 +236,9 @@ func (test TimeSpanFileTest) Run(t *testing.T) {
 	t.Parallel()
 	d := th.GetFromFile(t, test.File)
 	gd := graphdata.NewGraphData(d)
-	actualSpans := gd.LockFreeSpanInfos()
+	lf := gd.Lock()
+	defer gd.Unlock(lf)
+	actualSpans := gd.LockFreeSpanInfos(lf)
 	assert.Assert(t, is.Len(actualSpans, test.ExpectedSpanCount))
 	if len(test.ExpectedSpans) != 0 {
 		actual := sliceutils.Map(actualSpans, func(si *graphdata.SpanInfo) *data.TimeSpan { return si.TimeSpan })
@@ -238,5 +246,5 @@ func (test TimeSpanFileTest) Run(t *testing.T) {
 			assert.Assert(t, is.DeepEqual(span, actual[i]), "index %d", i)
 		}
 	}
-	assertEveryPointHasSpan(t, gd, gd.LockFreeSpanInfos())
+	assertEveryPointHasSpan(t, gd, lf, gd.LockFreeSpanInfos(lf))
 }

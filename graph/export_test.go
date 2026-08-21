@@ -45,16 +45,16 @@ type XAxisSpanBounds struct {
 // ComputeXAxisBounds runs the internal x-axis layout and returns the per-span pixel bounds plus the axis size,
 // letting tests assert layout invariants (e.g. the drawable area is fully used) without golden files.
 func (g *Graph) ComputeXAxisBounds(s terminal.Size, following bool) []XAxisSpanBounds {
-	g.data.Lock()
-	defer g.data.Unlock()
-	header := g.data.LockFreeHeader()
-	iter := g.data.LockFreeIter(following)
+	lf := g.data.Lock()
+	defer g.data.Unlock(lf)
+	header := g.data.LockFreeHeader(lf)
+	iter := g.data.LockFreeIter(lf, following)
 	x := computeXAxis(
 		bytes.NewConcurrentBuf(),
 		bytes.NewConcurrentBuf(),
 		s,
 		header.TimeSpan,
-		g.data.LockFreeSpanInfos(),
+		g.data.LockFreeSpanInfos(lf),
 		following,
 		int(iter.Total),
 	)

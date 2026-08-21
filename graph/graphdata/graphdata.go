@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -13,6 +13,7 @@ import (
 
 	"github.com/Lexer747/acci-ping/graph/data"
 	"github.com/Lexer747/acci-ping/ping"
+	"github.com/Lexer747/acci-ping/utils/syncutils"
 )
 
 // NOTE: GraphData does not have a [data.FromCompact] implementation because it is meant to be less strict layer on-top
@@ -42,48 +43,56 @@ func NewGraphData(d *data.Data) *GraphData {
 }
 
 func (gd *GraphData) AddPoint(p ping.PingResults) {
-	gd.Lock()
-	defer gd.Unlock()
+	gd.m.Lock()
+	defer gd.m.Unlock()
 	gd.data.AddPoint(p)
 	gd.addPointToSpans(p.Data, gd.data.TotalCount-1)
 }
 
 func (gd *GraphData) TotalCount() int64 {
-	gd.Lock()
-	defer gd.Unlock()
+	gd.m.Lock()
+	defer gd.m.Unlock()
 	return gd.data.TotalCount
 }
 
 func (gd *GraphData) String() string {
-	gd.Lock()
-	defer gd.Unlock()
+	gd.m.Lock()
+	defer gd.m.Unlock()
 	return gd.data.String()
 }
 
 func (gd *GraphData) Summary() string {
-	gd.Lock()
-	defer gd.Unlock()
+	gd.m.Lock()
+	defer gd.m.Unlock()
 	return gd.data.Summary()
 }
 
-func (gd *GraphData) Lock() {
+// This a compile time proof that the lock was actually acquired from this package, it does not guarantee if
+// multiple locks are used that the correct one is given and there are still workarounds if malice is desired,
+// but this is more a nice hint for the callees of the lock free API to only lock once and pass the proof
+// around.
+type graphDataLock struct{}
+type LockFree *syncutils.LockGuard[graphDataLock]
+
+func (gd *GraphData) Lock() LockFree {
 	gd.m.Lock()
+	return syncutils.New[graphDataLock](gd.m)
 }
-func (gd *GraphData) Unlock() {
+func (gd *GraphData) Unlock(proof LockFree) {
 	gd.m.Unlock()
 }
 
-func (gd *GraphData) LockFreeTotalCount() int64    { return gd.data.TotalCount }
-func (gd *GraphData) LockFreeHeader() *data.Header { return gd.data.Header }
-func (gd *GraphData) LockFreeURL() string          { return gd.data.URL }
-func (gd *GraphData) LockFreeRuns() *data.Runs     { return gd.data.Runs }
-func (gd *GraphData) LockFreeSpanInfos() Spans     { return gd.spans }
+func (gd *GraphData) LockFreeTotalCount(proof LockFree) int64    { return gd.data.TotalCount }
+func (gd *GraphData) LockFreeHeader(proof LockFree) *data.Header { return gd.data.Header }
+func (gd *GraphData) LockFreeURL(proof LockFree) string          { return gd.data.URL }
+func (gd *GraphData) LockFreeRuns(proof LockFree) *data.Runs     { return gd.data.Runs }
+func (gd *GraphData) LockFreeSpanInfos(proof LockFree) Spans     { return gd.spans }
 
-func (gd *GraphData) LockFreeIter(followLatestSpan bool) *Iter {
+func (gd *GraphData) LockFreeIter(proof LockFree, followLatestSpan bool) *Iter {
 	offset := int64(0)
-	total := gd.LockFreeTotalCount()
+	total := gd.LockFreeTotalCount(proof)
 	if followLatestSpan {
-		spans := gd.LockFreeSpanInfos()
+		spans := gd.LockFreeSpanInfos(proof)
 		lastIndex := len(spans) - 1
 		spansExceptLast := spans[:lastIndex]
 		offset = int64(spansExceptLast.Count())
@@ -93,7 +102,7 @@ func (gd *GraphData) LockFreeIter(followLatestSpan bool) *Iter {
 	return &Iter{
 		Total:  total,
 		d:      gd.data,
-		spans:  gd.LockFreeSpanInfos(),
+		spans:  gd.LockFreeSpanInfos(proof),
 		offset: offset,
 	}
 }

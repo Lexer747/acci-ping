@@ -47,8 +47,8 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 	// size of the terminal. Side note - we deliberately don't attach this to the terminal size channel since
 	// it's locked to the targeted FPS of this frame time anyway so just adds extra work.
 	s := g.Term.GetSize()
-	g.data.Lock()
-	count := g.data.LockFreeTotalCount()
+	lg := g.data.Lock()
+	count := g.data.LockFreeTotalCount(lg)
 	spinnerValue := ""
 	if cfg.drawSpinner {
 		spinnerValue = g.lastFrame.spinnerData.spinner(s)
@@ -56,7 +56,7 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 		g.drawingBuffer.Get(draw.SpinnerIndex).WriteString(spinnerValue)
 	}
 	if count == g.lastFrame.PacketCount && g.lastFrame.Match(s, cfg) {
-		g.data.Unlock() // fast path the frame didn't change
+		g.data.Unlock(lg) // fast path the frame didn't change
 		if updateGui := g.checkGUI(); updateGui != nil {
 			return updateGui
 		}
@@ -67,20 +67,20 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 	}
 	if count == 0 {
 		// nothing to do
-		g.data.Unlock()
+		g.data.Unlock(lg)
 		return noFrame
 	}
 
 	g.drawingBuffer.Reset(draw.GraphIndexes...)
 
-	header := g.data.LockFreeHeader()
-	iter := g.data.LockFreeIter(cfg.followLatestSpan)
+	header := g.data.LockFreeHeader(lg)
+	iter := g.data.LockFreeIter(lg, cfg.followLatestSpan)
 	x := computeXAxis(
 		g.drawingBuffer.Get(draw.XAxisIndex),
 		g.drawingBuffer.Get(draw.BarIndex),
 		s,
 		header.TimeSpan,
-		g.data.LockFreeSpanInfos(),
+		g.data.LockFreeSpanInfos(lg),
 		cfg.followLatestSpan,
 		int(iter.Total),
 	)
@@ -88,7 +88,7 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 	if cfg.followLatestSpan {
 		yStats = x.spans[0].pingStats
 	}
-	y := computeYAxis(g.drawingBuffer.Get(draw.YAxisIndex), s, yStats, g.data.LockFreeURL(), cfg.yAxisScale)
+	y := computeYAxis(g.drawingBuffer.Get(draw.YAxisIndex), s, yStats, g.data.LockFreeURL(lg), cfg.yAxisScale)
 	computeFrame(
 		g,
 		g.drawingBuffer.Get(draw.GradientIndex),
@@ -96,14 +96,14 @@ func (g *Graph) computeFrame(cfg computeFrameConfig) func(io.Writer) error {
 		g.drawingBuffer.Get(draw.DroppedIndex),
 		g.drawingBuffer.Get(draw.KeyIndex),
 		iter,
-		g.data.LockFreeRuns(),
+		g.data.LockFreeRuns(lg),
 		x, y, s,
 	)
 	g.drawingBuffer.Get(draw.SpinnerIndex).WriteString(spinnerValue)
 	// Everything we need is now cached we can unlock a bit early while we tidy up for the next frame
 	paintFrame := withGUI(g.drawingBuffer)
 	noGUI := withoutGUI(g.drawingBuffer)
-	g.data.Unlock()
+	g.data.Unlock(lg)
 	g.lastFrame = frame{
 		PacketCount:       count,
 		yAxis:             y,

@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	maxSliceSize = 1024 << 1
-	maxStatsSize = 1024 << 3
+	maxSliceSize = 512 << 1
+	maxStatsSize = 512 << 3
 )
 
 func TestCompactTimeSpan_Property(t *testing.T) {

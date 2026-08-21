@@ -61,13 +61,11 @@ func TestTerminalListener(t *testing.T) {
 			lastRune = r
 			return true
 		},
-		Listener: terminal.Listener{
-			Action: func(r rune) error {
-				assert.Equal(t, lastRune, r)
-				err := term.Print(string(r))
-				assert.NilError(t, err)
-				return nil
-			},
+		Action: func(r rune) error {
+			assert.Equal(t, lastRune, r)
+			err := term.Print(string(r))
+			assert.NilError(t, err)
+			return nil
 		},
 	}
 	_, err = term.StartRaw(ctx, cancelFunc, []terminal.ConditionalListener{testListener}, nil)
@@ -105,12 +103,10 @@ func TestTerminalFallbackListener(t *testing.T) {
 		Applicable: func(r rune) bool {
 			return r == 'a'
 		},
-		Listener: terminal.Listener{
-			Action: func(r rune) error {
-				<-m1
-				m2 <- struct{}{}
-				return nil
-			},
+		Action: func(r rune) error {
+			<-m1
+			m2 <- struct{}{}
+			return nil
 		},
 	}
 	fallback := terminal.Listener{

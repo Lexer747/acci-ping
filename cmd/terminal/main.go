@@ -48,11 +48,9 @@ func main() {
 		Applicable: func(r rune) bool {
 			return r == 'l'
 		},
-		Listener: terminal.Listener{
-			Name: "clear",
-			Action: func(rune) error {
-				return t.ClearScreen(terminal.UpdateSize)
-			},
+		Name: "clear",
+		Action: func(rune) error {
+			return t.ClearScreen(terminal.UpdateSize)
 		},
 	}
 	// Actually start the terminal program. Note that the listeners are applied in order, so if more than one

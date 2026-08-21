@@ -169,6 +169,24 @@ func TestGetChoices(t *testing.T) {
 
 		assertEqual(t, actual, expectedFlags)
 	})
+	t.Run("-<tab> drawframe", func(t *testing.T) {
+		t.Parallel()
+		expectedFlags := acciPingNonDebugFlags()
+
+		actual, err := getChoices(1, []string{"acci-ping", "-", "drawframe"}, accipingFlags, subCommands)
+		assert.NilError(t, err)
+
+		assertEqual(t, actual, expectedFlags)
+	})
+	t.Run("drawframe <tab>", func(t *testing.T) {
+		t.Parallel()
+		expectedFlags := acciPingNonDebugFlags()
+
+		actual, err := getChoices(3, []string{"acci-ping", "drawframe", ""}, accipingFlags, subCommands)
+		assert.NilError(t, err)
+
+		assertEqual(t, actual, expectedFlags)
+	})
 }
 
 func runGetChoices(args ...string) ([]string, error) {
@@ -183,16 +201,16 @@ type boolFlag interface {
 //nolint:staticcheck // ST1003 underscores are fine here we want casing to be correct for the command
 func make_acciping_Flags() Command {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
-	tf := tabflags.NewAutoCompleteFlagSet(f, false, "")
+	tf := tabflags.NewAutoCompleteFlagSet(f, tabflags.Nothing, "")
 	_ = application.NewSharedFlags(tf)
 
 	_ = tf.String("file", "", "skipped for test",
-		tabflags.AutoComplete{WantsFile: true, FileExt: ".go"})
+		tabflags.AutoComplete{Completion: tabflags.File, FileExt: ".go"})
 	_ = tf.Bool("hide-help", false, "skipped for test")
 	_ = tf.Bool("debug-error-creator", false, "skipped for test")
 	_ = tf.String("url", "www.google.com", "skipped for test", tabflags.AutoComplete{})
 	_ = tf.String("theme", "", "skipped for test",
-		tabflags.AutoComplete{Choices: themes.GetBuiltInNames(), WantsFile: true})
+		tabflags.AutoComplete{Choices: themes.GetBuiltInNames(), Completion: tabflags.File})
 	_ = tf.String("debug-term-size", "", "skipped for test", tabflags.AutoComplete{Choices: []string{"15x80", "20x85", "HxW"}})
 	_ = tf.Bool("follow", false, "skipped for test")
 	_ = tf.Int("debug-fps", 240, "skipped for test")
@@ -203,13 +221,13 @@ func make_acciping_Flags() Command {
 //nolint:staticcheck
 func make_drawframe_Flags() Command {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
-	tf := tabflags.NewAutoCompleteFlagSet(f, true, ".go")
+	tf := tabflags.NewAutoCompleteFlagSet(f, tabflags.File|tabflags.Folder, ".go")
 	_ = application.NewSharedFlags(tf)
 	_ = tf.Bool("debug-follow", false, "skipped for test")
 	_ = tf.String("term-size", "", "skipped for test",
 		tabflags.AutoComplete{Choices: []string{"15x80", "20x85", "HxW"}})
 	_ = tf.String("theme", "", "skipped for test",
-		tabflags.AutoComplete{Choices: themes.GetBuiltInNames(), WantsFile: true})
+		tabflags.AutoComplete{Choices: themes.GetBuiltInNames(), Completion: tabflags.File})
 	_ = tf.Bool("log-scale", false, "skipped for test")
 	return Command{Cmd: "drawframe", Fs: tf}
 }

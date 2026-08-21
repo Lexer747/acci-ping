@@ -24,7 +24,7 @@ import (
 	"github.com/Lexer747/acci-ping/utils/sliceutils"
 )
 
-const debug = false
+const debug = true
 
 const AutoCompleteString = "b2827fc8fc8c8267cb15f5a925de7e4712aa04ef2fbd43458326b595d66a36d9" // sha256 of `autoCompleteString`
 
@@ -100,11 +100,11 @@ func getChoices(index int, _COMP_LINE []string, base Command, cmds []Command) ([
 		// determine if we have a subcommand selected or are embracing the base and selecting flags
 		isBase := strings.HasPrefix(_COMP_LINE[1], "-")
 		var flags *tabflags.FlagSet
-		var wantsFile bool
+		var wants tabflags.Wants
 		var curCommand, fileExt string
 		if isBase {
 			flags = base.Fs
-			wantsFile = base.Fs.WantsFile()
+			wants = base.Fs.Wants()
 			curCommand = base.Cmd
 			fileExt = base.Fs.FileExt()
 		} else {
@@ -115,12 +115,12 @@ func getChoices(index int, _COMP_LINE []string, base Command, cmds []Command) ([
 			}
 			cmd := choice[0]
 			flags = cmd.Fs
-			wantsFile = cmd.Fs.WantsFile()
+			wants = cmd.Fs.Wants()
 			curCommand = cmd.Cmd
 			fileExt = cmd.Fs.FileExt()
 		}
 		cur := _COMP_LINE[len(_COMP_LINE)-1]
-		return suggestionAutoComplete(index, _COMP_LINE, flags, wantsFile, fileExt, cur, curCommand), nil
+		return suggestionAutoComplete(index, _COMP_LINE, flags, wants, fileExt, cur, curCommand), nil
 	}
 	slog.Error("unable to solve")
 	return nil, errors.Errorf("unexpected inputs")
@@ -130,17 +130,11 @@ func suggestionAutoComplete(
 	index int,
 	_COMP_LINE []string,
 	flags *tabflags.FlagSet,
-	wantsFile bool,
+	wants tabflags.Wants,
 	fileExt, cur, curCommand string,
 ) []string {
 	alreadySet := _COMP_LINE[1:index]
-	var files []string
-	if wantsFile {
-		files = getWorkingDirFiles()
-		if fileExt != "" {
-			files = sliceutils.Filter(files, func(path string) bool { return filepath.Ext(path) == fileExt })
-		}
-	}
+	files := getLocalOptions(wants, fileExt)
 
 	prev := _COMP_LINE[index-1]
 	ac := flags.GetAutoCompleteFor(prev)
@@ -155,16 +149,39 @@ func suggestionAutoComplete(
 		return returnFlagSetNames(cur, flags, files, alreadySet)
 	}
 	toSuggest := *ac
-	if toSuggest.WantsFile {
-		files = getWorkingDirFiles()
-		if toSuggest.FileExt != "" {
-			files = sliceutils.Filter(files, func(path string) bool { return filepath.Ext(path) == toSuggest.FileExt })
-		}
-	}
+	files = getLocalOptions(toSuggest.Completion, toSuggest.FileExt)
 	if len(toSuggest.Choices) == 0 {
 		return returnFlagSetNames(cur, flags, files, alreadySet)
 	}
 	return filterByPrefix(slices.Concat(toSuggest.Choices, files), cur)
+}
+
+func getLocalOptions(wants tabflags.Wants, fileExt string) []string {
+	var files []string
+	if wants.WantsFolderOrFile() {
+		files = getWorkingDirFiles()
+		var filter func(path string) bool
+		// TODO this isn't good enough need to use stat or something to tell files from folders.
+		switch {
+		case fileExt != "" && wants.IsSet(tabflags.Folder):
+			// folders are requested so don't filter them out
+			filter = func(path string) bool {
+				return filepath.Ext(path) == "" || filepath.Ext(path) == fileExt
+			}
+		case wants.IsSet(tabflags.Folder):
+			filter = func(path string) bool {
+				return filepath.Ext(path) == ""
+			}
+		case fileExt != "":
+			filter = func(path string) bool {
+				return filepath.Ext(path) == fileExt
+			}
+		default:
+			filter = func(path string) bool { return true }
+		}
+		files = sliceutils.Filter(files, filter)
+	}
+	return files
 }
 
 func getWorkingDirFiles() (files []string) {

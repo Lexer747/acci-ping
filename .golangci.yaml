@@ -17,6 +17,7 @@ linters:
     - gocritic
     - godot
     - godox
+    - gomodguard # 'gomodguard' is deprecated
     - ireturn
     - mnd
     - nlreturn

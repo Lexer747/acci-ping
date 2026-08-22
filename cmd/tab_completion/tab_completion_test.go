@@ -241,8 +241,10 @@ func filesByExt(ext string) []string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	files := sliceutils.Map(entries, func(d os.DirEntry) string { return d.Name() })
-	return sliceutils.Filter(files, func(f string) bool { return ext == "" || filepath.Ext(f) == ext })
+	return sliceutils.FilterMap(entries, func(d os.DirEntry) (string, bool) {
+		n := d.Name()
+		return n, ext == "" || filepath.Ext(n) == ext
+	})
 }
 
 func folders() []string {

@@ -180,7 +180,7 @@ func TestGetChoices(t *testing.T) {
 	})
 	t.Run("drawframe <tab>", func(t *testing.T) {
 		t.Parallel()
-		expectedFlags := acciPingNonDebugFlags()
+		expectedFlags := append(drawframeNonDebugFlags(), "tab_completion.go", "tab_completion_test.go", "tabflags")
 
 		actual, err := getChoices(3, []string{"acci-ping", "drawframe", ""}, accipingFlags, subCommands)
 		assert.NilError(t, err)

@@ -159,37 +159,37 @@ func suggestionAutoComplete(
 func getLocalOptions(wants tabflags.Wants, fileExt string) []string {
 	var files []string
 	if wants.WantsFolderOrFile() {
-		files = getWorkingDirFiles()
-		var filter func(path string) bool
-		// TODO this isn't good enough need to use stat or something to tell files from folders.
+		entries := getWorkingDirFiles()
+		var filter func(path os.DirEntry) bool
 		switch {
 		case fileExt != "" && wants.IsSet(tabflags.Folder):
 			// folders are requested so don't filter them out
-			filter = func(path string) bool {
-				return filepath.Ext(path) == "" || filepath.Ext(path) == fileExt
+			filter = func(path os.DirEntry) bool {
+				return path.IsDir() || filepath.Ext(path.Name()) == fileExt
 			}
 		case wants.IsSet(tabflags.Folder):
-			filter = func(path string) bool {
-				return filepath.Ext(path) == ""
+			filter = func(path os.DirEntry) bool {
+				return path.IsDir()
 			}
 		case fileExt != "":
-			filter = func(path string) bool {
-				return filepath.Ext(path) == fileExt
+			filter = func(path os.DirEntry) bool {
+				return filepath.Ext(path.Name()) == fileExt
 			}
 		default:
-			filter = func(path string) bool { return true }
+			filter = func(path os.DirEntry) bool { return true }
 		}
-		files = sliceutils.Filter(files, filter)
+		entries = sliceutils.Filter(entries, filter)
+		files = sliceutils.Map(entries, func(path os.DirEntry) string { return path.Name() })
 	}
 	return files
 }
 
-func getWorkingDirFiles() (files []string) {
+func getWorkingDirFiles() (entries []os.DirEntry) {
 	f, err := os.Open("./")
 	if err != nil {
 		slog.Error("failed to get files", "err", err)
 	}
-	files, err = f.Readdirnames(0)
+	entries, err = f.ReadDir(0)
 	if err != nil {
 		slog.Error("failed to get files", "err", err)
 	}
@@ -197,7 +197,7 @@ func getWorkingDirFiles() (files []string) {
 	if err != nil {
 		slog.Error("failed to close dir", "err", err)
 	}
-	return files
+	return entries
 }
 
 func returnFlagSetNames(cur string, flags *tabflags.FlagSet, files, alreadySet []string) []string {

@@ -35,7 +35,7 @@ var subCommands = []Command{
 //nolint:goconst // constants are not desirable here
 func TestGetChoices(t *testing.T) {
 	t.Parallel()
-	t.Run("tab", func(t *testing.T) {
+	t.Run("<tab>", func(t *testing.T) {
 		t.Parallel()
 		actual, err := runGetChoices("acci-ping")
 		assert.NilError(t, err)
@@ -69,13 +69,12 @@ func TestGetChoices(t *testing.T) {
 		expectedFlags := acciPingNonDebugFlags()
 		assertEqual(t, actual, expectedFlags)
 	})
-	t.Run("start drawframe tab", func(t *testing.T) {
+	t.Run("start drawframe <tab>", func(t *testing.T) {
 		t.Parallel()
 		actual, err := runGetChoices("acci-ping", "drawframe", "")
 		assert.NilError(t, err)
 
-		expectedFlags := drawframeNonDebugFlags()
-		expectedFlags = slices.Concat(expectedFlags, filesByExt(".go"))
+		expectedFlags := drawframeNonDebugFlagsAll()
 		assertEqual(t, actual, expectedFlags)
 	})
 	t.Run("start drawframe -t", func(t *testing.T) {
@@ -180,7 +179,7 @@ func TestGetChoices(t *testing.T) {
 	})
 	t.Run("drawframe <tab>", func(t *testing.T) {
 		t.Parallel()
-		expectedFlags := append(drawframeNonDebugFlags(), "tab_completion.go", "tab_completion_test.go", "tabflags")
+		expectedFlags := drawframeNonDebugFlagsAll()
 
 		actual, err := getChoices(3, []string{"acci-ping", "drawframe", ""}, accipingFlags, subCommands)
 		assert.NilError(t, err)
@@ -246,6 +245,16 @@ func filesByExt(ext string) []string {
 	return sliceutils.Filter(files, func(f string) bool { return ext == "" || filepath.Ext(f) == ext })
 }
 
+func folders() []string {
+	entries, err := os.ReadDir("./")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return sliceutils.FilterMap(entries, func(d os.DirEntry) (string, bool) {
+		return d.Name(), d.IsDir()
+	})
+}
+
 func assertEqual(t *testing.T, expected, actual []string) {
 	t.Helper()
 	slices.Sort(actual)
@@ -272,5 +281,12 @@ func drawframeNonDebugFlags() []string {
 		}
 		expectedFlags = append(expectedFlags, "-"+f.Name)
 	})
+	return expectedFlags
+}
+
+func drawframeNonDebugFlagsAll() []string {
+	expectedFlags := drawframeNonDebugFlags()
+	expectedFlags = slices.Concat(expectedFlags, filesByExt(".go"))
+	expectedFlags = slices.Concat(expectedFlags, folders())
 	return expectedFlags
 }

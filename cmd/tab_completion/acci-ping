@@ -1,9 +1,13 @@
 _acci-ping()
 {
     # $COMP_WORDS # an array of all the words typed after the name of the program the compspec belongs to
-    # $COMP_CWORD # an index of the COMP_WORDS array pointing to the word the current cursor is at - in other words, the index of the word the cursor was when the tab key was pressed
+    # $COMP_CWORD # an index of the COMP_WORDS array pointing to the word the current cursor is at - in other
+                  # words, the index of the word the cursor was when the tab key was pressed
     # $COMP_LINE # the current command line
 
+    # These hashes are just the sha256 of `autoCompleteString` and is instead of using a delimiter which is
+    # more normal, comma, spaces, etc. we use this delimiter which is incredibly unlikely to clash and there by
+    # reducing the need to escape inputs to zero.
     local reply
     reply=$(acci-ping b2827fc8fc8c8267cb15f5a925de7e4712aa04ef2fbd43458326b595d66a36d9 "$COMP_CWORD" b2827fc8fc8c8267cb15f5a925de7e4712aa04ef2fbd43458326b595d66a36d9 "${COMP_WORDS[*]}" b2827fc8fc8c8267cb15f5a925de7e4712aa04ef2fbd43458326b595d66a36d9 "$COMP_LINE")
     IFS=" " read -r -a COMPREPLY <<< "$reply"

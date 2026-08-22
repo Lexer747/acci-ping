@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -80,11 +80,12 @@ type SharedFlags struct {
 
 func NewSharedFlags(tf *tabflags.FlagSet) *SharedFlags {
 	return &SharedFlags{
-		cpuprofile:  tf.String("debug-cpuprofile", "", "write cpu profile to `file`", tabflags.AutoComplete{WantsFile: true}),
+		cpuprofile:  tf.String("debug-cpuprofile", "", "write cpu profile to `file`", tabflags.AutoComplete{Completion: tabflags.File}),
 		debugStrict: tf.Bool("debug-strict", false, "enables more strict operation in which warnings turn into crashes."),
-		logFile:     tf.String("debug-log", "", "write logs to `file`. (default no logs written)", tabflags.AutoComplete{WantsFile: true}),
-		memprofile:  tf.String("debug-memprofile", "", "write memory profile to `file`", tabflags.AutoComplete{WantsFile: true}),
-		helpDebug:   tf.Bool("help-debug", false, "prints all additional debug arguments"),
+		logFile: tf.String("debug-log", "", "write logs to `file`. (default no logs written)",
+			tabflags.AutoComplete{Completion: tabflags.File}),
+		memprofile: tf.String("debug-memprofile", "", "write memory profile to `file`", tabflags.AutoComplete{Completion: tabflags.File}),
+		helpDebug:  tf.Bool("help-debug", false, "prints all additional debug arguments"),
 	}
 }
 

@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -45,9 +45,13 @@ func Run(args []string, base Command, subCommands []Command) {
 	}
 	// Catch panic's in the case of a mistake in this algorithm simply return no autocomplete suggestions.
 	defer func() {
-		if err := recover(); err != nil {
-			slog.Error("caught panic", "err", err)
-			tabExitFailure()
+		if recovered := recover(); recovered != nil {
+			if err, ok := recovered.(error); ok {
+				tabExitFailure(errors.Wrap(err, "panicked"))
+			} else {
+				slog.Error("caught panic", "recovered", recovered)
+				tabExitFailure(errors.Errorf("panicked"))
+			}
 		}
 	}()
 	slog.Debug("auto complete called with", "args", args)
@@ -67,14 +71,14 @@ func Run(args []string, base Command, subCommands []Command) {
 
 	index, err := strconv.Atoi(_COMP_CWORD)
 	if err != nil {
-		tabExitFailure()
+		tabExitFailure(err)
 	}
 
 	slog.Debug("inputs", "index", index, "_COMP_CWORD", _COMP_CWORD, "_COMP_LINE", _COMP_LINE, "_COMP_WORDS", _COMP_WORDS)
 	choices, err := getChoices(index, _COMP_LINE, base, subCommands)
 	slog.Debug("results", "choices", choices, "err", err)
 	if err != nil {
-		tabExitFailure()
+		tabExitFailure(err)
 		return
 	}
 	tabExit(choices)
@@ -100,11 +104,11 @@ func getChoices(index int, _COMP_LINE []string, base Command, cmds []Command) ([
 		// determine if we have a subcommand selected or are embracing the base and selecting flags
 		isBase := strings.HasPrefix(_COMP_LINE[1], "-")
 		var flags *tabflags.FlagSet
-		var wantsFile bool
+		var wants tabflags.Wants
 		var curCommand, fileExt string
 		if isBase {
 			flags = base.Fs
-			wantsFile = base.Fs.WantsFile()
+			wants = base.Fs.Wants()
 			curCommand = base.Cmd
 			fileExt = base.Fs.FileExt()
 		} else {
@@ -115,14 +119,13 @@ func getChoices(index int, _COMP_LINE []string, base Command, cmds []Command) ([
 			}
 			cmd := choice[0]
 			flags = cmd.Fs
-			wantsFile = cmd.Fs.WantsFile()
+			wants = cmd.Fs.Wants()
 			curCommand = cmd.Cmd
 			fileExt = cmd.Fs.FileExt()
 		}
 		cur := _COMP_LINE[len(_COMP_LINE)-1]
-		return suggestionAutoComplete(index, _COMP_LINE, flags, wantsFile, fileExt, cur, curCommand), nil
+		return suggestionAutoComplete(index, _COMP_LINE, flags, wants, fileExt, cur, curCommand)
 	}
-	slog.Error("unable to solve")
 	return nil, errors.Errorf("unexpected inputs")
 }
 
@@ -130,16 +133,13 @@ func suggestionAutoComplete(
 	index int,
 	_COMP_LINE []string,
 	flags *tabflags.FlagSet,
-	wantsFile bool,
+	wants tabflags.Wants,
 	fileExt, cur, curCommand string,
-) []string {
+) ([]string, error) {
 	alreadySet := _COMP_LINE[1:index]
-	var files []string
-	if wantsFile {
-		files = getWorkingDirFiles()
-		if fileExt != "" {
-			files = sliceutils.Filter(files, func(path string) bool { return filepath.Ext(path) == fileExt })
-		}
+	files, err := getLocalOptions(wants, fileExt)
+	if err != nil {
+		return nil, err
 	}
 
 	prev := _COMP_LINE[index-1]
@@ -147,40 +147,83 @@ func suggestionAutoComplete(
 	if ac == nil {
 		includeDebug := strings.HasPrefix(cur, "-d")
 		names := flags.GetNames(includeDebug, alreadySet)
-		return filterByPrefix(slices.Concat(names, files), cur)
+		return filterByPrefix(slices.Concat(names, files), cur), nil
 	}
 
 	// suggest continuation
 	if prev == curCommand {
-		return returnFlagSetNames(cur, flags, files, alreadySet)
+		return returnFlagSetNames(cur, flags, files, alreadySet), nil
 	}
 	toSuggest := *ac
-	if toSuggest.WantsFile {
-		files = getWorkingDirFiles()
-		if toSuggest.FileExt != "" {
-			files = sliceutils.Filter(files, func(path string) bool { return filepath.Ext(path) == toSuggest.FileExt })
-		}
+	files, err = getLocalOptions(toSuggest.Completion, toSuggest.FileExt)
+	if err != nil {
+		return nil, err
 	}
 	if len(toSuggest.Choices) == 0 {
-		return returnFlagSetNames(cur, flags, files, alreadySet)
+		return returnFlagSetNames(cur, flags, files, alreadySet), nil
 	}
-	return filterByPrefix(slices.Concat(toSuggest.Choices, files), cur)
+	return filterByPrefix(slices.Concat(toSuggest.Choices, files), cur), nil
 }
 
-func getWorkingDirFiles() (files []string) {
+// getLocalOptions searches the working dir for the given matching set of possible continuations. The
+// continuations depend on the parameters passed, see [tabflags.Wants] and for files, further filtered by the
+// file extension.
+func getLocalOptions(wants tabflags.Wants, fileExt string) ([]string, error) {
+	var files []string
+	if wants.WantsFolderOrFile() {
+		entries, err := getWorkingDirFiles()
+		if err != nil {
+			return files, err
+		}
+		var filterMap func(path os.DirEntry) (string, bool)
+		switch {
+		case fileExt != "" && wants.IsSet(tabflags.Folder):
+			// folders are requested so don't filter them out
+			filterMap = func(path os.DirEntry) (string, bool) {
+				n := path.Name()
+				return n, path.IsDir() || filepath.Ext(n) == fileExt
+			}
+		case wants.IsSet(tabflags.Folder):
+			filterMap = func(path os.DirEntry) (string, bool) {
+				n := path.Name()
+				return n, path.IsDir()
+			}
+		case fileExt != "":
+			filterMap = func(path os.DirEntry) (string, bool) {
+				n := path.Name()
+				return n, filepath.Ext(n) == fileExt
+			}
+		default:
+			filterMap = func(path os.DirEntry) (string, bool) { return path.Name(), true }
+		}
+		files = sliceutils.FilterMap(entries, filterMap)
+	}
+	return files, nil
+}
+
+func getWorkingDirFiles() (entries []os.DirEntry, err error) {
 	f, err := os.Open("./")
 	if err != nil {
-		slog.Error("failed to get files", "err", err)
+		return entries, errors.Wrapf(err, "failed to open working dir %q", currentDirErrorString())
 	}
-	files, err = f.Readdirnames(0)
+	entries, err = f.ReadDir(0)
 	if err != nil {
-		slog.Error("failed to get files", "err", err)
+		return entries, errors.Wrapf(err, "failed to get entries %q", currentDirErrorString())
 	}
 	err = f.Close()
 	if err != nil {
-		slog.Error("failed to close dir", "err", err)
+		return entries, errors.Wrapf(err, "failed to close working dir %q", currentDirErrorString())
 	}
-	return files
+	return entries, nil
+}
+
+func currentDirErrorString() string {
+	dir, err := os.Getwd()
+	if err == nil {
+		return dir
+	} else {
+		return "unknown dir: err(" + err.Error() + ")"
+	}
 }
 
 func returnFlagSetNames(cur string, flags *tabflags.FlagSet, files, alreadySet []string) []string {
@@ -253,7 +296,8 @@ func tabExit(results []string) {
 	fmt.Fprint(os.Stdout, strings.Join(results, " "))
 	exit.Success()
 }
-func tabExitFailure() {
+func tabExitFailure(err error) {
+	slog.Error("tabExitFailure", "err", err)
 	tabExit([]string{})
 }
 

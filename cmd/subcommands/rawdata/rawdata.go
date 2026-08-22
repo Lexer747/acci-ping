@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -27,7 +27,7 @@ type Config struct {
 
 func GetFlags() *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
-	tf := tabflags.NewAutoCompleteFlagSet(f, true, ".pings")
+	tf := tabflags.NewAutoCompleteFlagSet(f, tabflags.File, ".pings")
 	ret := &Config{
 		FlagSet:  tf,
 		printAll: tf.Bool("all", false, "prints all raw values otherwise only summarises '.pings' files"),

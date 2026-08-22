@@ -122,6 +122,18 @@ func Filter[S ~[]T, T any](slice S, useInOutput func(T) bool) S {
 	return ret
 }
 
+// FilterMap returns a shallow clone of [slice] where only the values which return true from the predicate are
+// included. Converted by [Map], this is more efficient than calling them in sequence.
+func FilterMap[S ~[]IN, IN, OUT any](slice S, useInOutput func(IN) (OUT, bool)) []OUT {
+	ret := make([]OUT, 0)
+	for _, item := range slice {
+		if out, ok := useInOutput(item); ok {
+			ret = append(ret, out)
+		}
+	}
+	return ret
+}
+
 // TakeRandom returns a random element from the slice, or the zero value if the slice is empty.
 //
 // This is not a cryptographically secure random, do not use this for security.

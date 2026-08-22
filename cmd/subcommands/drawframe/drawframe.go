@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2024-2025 Lexer747
+// Copyright 2024-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -43,7 +43,7 @@ type Config struct {
 
 func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
-	tf := tabflags.NewAutoCompleteFlagSet(f, true, ".pings")
+	tf := tabflags.NewAutoCompleteFlagSet(f, tabflags.File|tabflags.Folder, ".pings")
 	sf := application.NewSharedFlags(tf)
 	ret := &Config{
 		BuildInfo:   info,
@@ -60,7 +60,7 @@ func GetFlags(info *application.BuildInfo) *Config {
 			"There's also the builtin themes:\n"+strings.Join(themes.DescribeBuiltins(), "\n")+
 			"\nSee the docs "+ansi.Blue("https://github.com/Lexer747/acci-ping/blob/main/docs/themes.md")+
 			" for how to create custom themes.",
-			tabflags.AutoComplete{Choices: themes.GetBuiltInNames(), WantsFile: true, FileExt: ".json"}),
+			tabflags.AutoComplete{Choices: themes.GetBuiltInNames(), Completion: tabflags.File, FileExt: ".json"}),
 		yAxisScale: tf.Bool("log-scale", false, "switches the y-axis to be in logarithmic scaling instead of linear"),
 	}
 	f.Usage = func() {

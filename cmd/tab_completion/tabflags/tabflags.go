@@ -1,6 +1,6 @@
 // Use of this source code is governed by a GPL-2 license that can be found in the LICENSE file.
 //
-// Copyright 2025 Lexer747
+// Copyright 2025-2026 Lexer747
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -17,9 +17,9 @@ import (
 )
 
 type AutoComplete struct {
-	FileExt   string
-	Choices   []string
-	WantsFile bool
+	FileExt    string
+	Choices    []string
+	Completion Wants
 }
 
 type Flag struct {
@@ -36,31 +36,30 @@ type FlagSet struct {
 	nameToAc map[string]*AutoComplete
 	o        *sync.Once
 
-	fileExt   string
-	flags     []Flag
-	wantsFile bool
+	fileExt    string
+	flags      []Flag
+	completion Wants
 }
 
-// NewAutoCompleteFlagSet wraps a [flag.FlagSet] with autocomplete configuration, if [wantsFile] is set then
+// NewAutoCompleteFlagSet wraps a [flag.FlagSet] with autocomplete configuration, if [completion] is set then
 // it's expected that the overall command wants a file so autocomplete suggestions from the working dir will
 // be given. If [fileExt] is set then only the files which match the extension are suggested.
-func NewAutoCompleteFlagSet(f *flag.FlagSet, wantsFile bool, fileExt string) *FlagSet {
+func NewAutoCompleteFlagSet(f *flag.FlagSet, completion Wants, fileExt string) *FlagSet {
 	return &FlagSet{
-		FlagSet:   f,
-		flags:     []Flag{},
-		nameToAc:  map[string]*AutoComplete{},
-		wantsFile: wantsFile,
-		fileExt:   fileExt,
-		o:         &sync.Once{},
+		FlagSet:    f,
+		flags:      []Flag{},
+		nameToAc:   map[string]*AutoComplete{},
+		completion: completion,
+		fileExt:    fileExt,
+		o:          &sync.Once{},
 	}
 }
 
-// WantsFile returns true if this flag set wants a file as a free form arg.
-func (f *FlagSet) WantsFile() bool {
-	return f.wantsFile
+func (f *FlagSet) Wants() Wants {
+	return f.completion
 }
 
-// FileExt returns the specified file extensions to look for if [FlagSet.WantsFile] returns true.
+// FileExt returns the specified file extensions to look for if [FlagSet.Wants] returns File.
 func (f *FlagSet) FileExt() string {
 	return f.fileExt
 }

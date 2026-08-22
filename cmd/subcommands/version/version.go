@@ -23,7 +23,7 @@ type Config struct {
 
 func GetFlags(info *application.BuildInfo) *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
-	tf := tabflags.NewAutoCompleteFlagSet(f, false, "")
+	tf := tabflags.NewAutoCompleteFlagSet(f, tabflags.Nothing, "")
 	ret := &Config{
 		BuildInfo: info,
 		FlagSet:   tf,

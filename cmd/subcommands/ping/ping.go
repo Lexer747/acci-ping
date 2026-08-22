@@ -26,7 +26,7 @@ type Config struct {
 
 func GetFlags() *Config {
 	f := flag.NewFlagSet("", flag.ContinueOnError)
-	tf := tabflags.NewAutoCompleteFlagSet(f, false, "")
+	tf := tabflags.NewAutoCompleteFlagSet(f, tabflags.Nothing, "")
 	ret := &Config{
 		url:     tf.String("url", "www.google.com", "the url to target for ping testing", tabflags.AutoComplete{}),
 		count:   tf.Int("n", 4, "the number of packets to send. 0 or smaller means continuous running."),
